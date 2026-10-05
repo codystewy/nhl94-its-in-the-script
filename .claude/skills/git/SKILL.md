@@ -1,12 +1,12 @@
 ---
-name: gp
-description: "Git push for the nhl94-its-in-the-script repo. Commits anything uncommitted (Conventional Commits), summarizes every unpushed change, decides whether a release is warranted (patch/minor/major), previews the version bump, CHANGELOG entry and README What's new, then pushes after the user confirms. Use when the user types /gp, /gp push, or asks to push changes or cut a release."
+name: git
+description: "Git push for the nhl94-its-in-the-script repo. Commits anything uncommitted (Conventional Commits), summarizes every unpushed change, decides whether a release is warranted (patch/minor/major), previews the version bump, CHANGELOG entry and README What's new, then pushes after the user confirms. Use when the user types /git, /git push, /git status, or asks to push changes or cut a release."
 argument-hint: "push | status"
 ---
 
-# /gp: summarize, version and push
+# /git: summarize, version and push
 
-`/gp push` (or just `/gp`) runs the whole flow below. `/gp status` runs steps 1–3 only and stops with the preview, without committing, bumping or pushing anything.
+`/git push` (or just `/git`) runs the whole flow below. `/git status` runs steps 1–3 only and stops with the preview, without committing, bumping or pushing anything.
 
 The repo is `codystewy/nhl94-its-in-the-script`, and the shipped file is `nhl94-its-in-the-script.user.js`. Versions are SemVer `1.MINOR.PATCH` and are tagged `vX.Y.Z`.
 
