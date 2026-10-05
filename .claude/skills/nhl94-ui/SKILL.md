@@ -11,9 +11,16 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 
 - **Clarity first.** Show the most useful information first, use plain labels, and give actions an obvious affordance. Every element should answer a question a coach actually has, such as "who do I play next, who coaches them, what's left before the checkpoint".
 - **Modern NHL look with a retro soul.** Dark broadcast UI, condensed uppercase type (Oswald), slanted buttons and broadcast-style stripes. Add 16-bit touches: the Press Start 2P pixel font for numbers and labels, sharp pixel-art logos (`image-rendering: pixelated`) and scanlines. Don't let the retro touches hurt readability.
-- **Palettes per page:**
-  - **Coach page:** dark theme in Calgary Flames colors: red `#C8102E`, dark red `#8E0C21`, gold `#F1BE48`.
-  - **Home page:** the light **"Classic '94"** theme (`.nx-t94`, which overrides the CSS variables), built from the original site's colors. Royal blue `#3366CC`, steel blue `#6699CC`, light-blue panels `#E5EEF6`/`#D3E2EA`, dark red `#9B0000`, a black `#1E1E1E` menu bar and yellow `#FFCC00` highlights. The background is the site's own `/images/bg.gif` (fixed, fading to `#6699CC`). New pages should ask or follow whichever theme the user picks.
+- **Theming = accents × mode** (never hard-code colours; use the tokens):
+  - **Accents per page:** set with `applyPalette(root, …)`.
+    - **Coach page:** `teamPalette(myTeam)`, built from `TEAM_COLORS` (1993-94 primary/secondary per city). Near-black primaries (Bruins, Kings, Penguins) use their second colour for buttons.
+    - **Home page:** `HOME_PALETTE`, the original site's royal blue `#3366CC` hero, dark red `#9B0000` buttons, yellow `#FFCC00` highlights and blue links in Day mode.
+    - `makePalette()` works out readable text colours (`--nx-acc-n` / `--nx-acc-d`, `--nx-on-red`, `--nx-on-gold`) with WCAG contrast maths, so any team works.
+  - **Mode:** `data-nx-theme="night"` (the default) or `"day"` on each `.nx-v1` root. It's saved as `nx:theme`, and the ☀/☾ buttons sit in the bottom-right VIEW switcher. Night uses navy surfaces. Day uses the original site's light blues and its own `/images/bg.gif` background. The hero band stays a saturated team colour with white text in both modes. The ticker and top bar stay dark in both.
+  - **Tokens:**
+    - Accents: `--nx-hero1`, `--nx-red` (button/active fill), `--nx-gold` (highlight fill), and `--nx-acc` (accent as text on the current surface).
+    - Surfaces: `--nx-bg/bg2/card/card2/line/line2/text/mute/dim/strong/thead/row-home/row-away/grp1/score/hover/me/cardh*/shadow/page`.
+  - Check every change in **both modes** and at least two very different teams (e.g. 6716 LA black/silver and 6720 Toronto navy/white): `EXTRA_JS="localStorage.setItem('nx:theme', JSON.stringify('day'));" dev/preview.sh 6720 v1`.
   - Win green, loss red and tie gold are reserved for results.
 - **Usability rules:** keep focus outlines visible, respect `prefers-reduced-motion`, make text readable at 13px or larger in body copy, give buttons generous click targets, make layouts collapse cleanly on narrow screens, and add no layout jank on load.
 - Take the initiative on helpful touches, but stay within what the user asked for. When you add something extra, say what it is.

@@ -12,6 +12,15 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 | ![Original coach page](docs/screenshots/coach-classic.png) | ![V1 coach page](docs/screenshots/coach-v1-final.png)<br><sub>Coach page with the Final filter on: grouped by opponent, with coach names, results and OT tags</sub> |
 
 <details>
+<summary><b>Day mode</b></summary>
+
+| Home (Day) | Coach page (Day) |
+| --- | --- |
+| ![V1 home page, Day mode](docs/screenshots/home-v1-day.png) | ![V1 coach page, Day mode](docs/screenshots/coach-v1-day.png) |
+
+</details>
+
+<details>
 <summary><b>Phone view</b></summary>
 
 <img src="docs/screenshots/coach-v1-mobile.png" alt="V1 coach page on a phone" width="320">
@@ -39,7 +48,9 @@ A **VIEW** switcher sits in the bottom-right corner of every redesigned page:
 | **Classic** | The original nhl94online.com page, untouched |
 | **V1** | *Rink Night*: a dark NHL 26 broadcast look with 16-bit touches |
 
-The page remembers your choice. Press **Alt + Shift + V** to cycle through the views. New designs are added as new versions; old ones stay available.
+Next to the views there's a **☀ Day / ☾ Night** toggle. Night is the default, and the choice applies to every page.
+
+The page remembers your choices. Press **Alt + Shift + V** to cycle through the views. New designs are added as new versions; old ones stay available.
 
 ## What V1 gives you
 
@@ -52,6 +63,7 @@ The page remembers your choice. Press **Alt + Shift + V** to cycle through the v
 
 **Coach page**
 
+- **Team colors:** every coach page is themed in that team's own colors (1993-94 era), in both Day and Night mode. The home page uses the original site's red, white and blue.
 - **Coach names everywhere:** on the schedule, standings, filters and league list.
 - **Schedule grouped by opponent:** one header per opponent with their logo, coach, your record against them, a box per game for wins and losses, and games left. Click a header to collapse it.
 - **Filters:** All / To Play / Final tabs, plus coach pills you can switch on and off. Both are saved per coach page.
