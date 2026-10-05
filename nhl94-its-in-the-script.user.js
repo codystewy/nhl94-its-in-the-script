@@ -6,8 +6,8 @@
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
 // @supportURL   https://github.com/codystewy/nhl94-its-in-the-script/issues
-// @updateURL    https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js
-// @downloadURL  https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js
+// @updateURL    https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js
+// @downloadURL  https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js
 // @match        https://nhl94online.com/*
 // @match        http://nhl94online.com/*
 // @match        https://www.nhl94online.com/*
@@ -25,6 +25,9 @@
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
   const SCRIPT_VERSION = '1.4.1';
+  // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
+  const CHANNEL = 'stable';
+  const FUN = CHANNEL === 'fun'; // gate fun-only extras with `if (FUN)`
 
   // ============================================================
   // Helpers
@@ -1535,6 +1538,7 @@
   .nx-sw-mode { display: flex; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid #323a4a; }
   body[data-nx-view="classic"] .nx-sw-mode { display: none; }
   .nx-sw-ver { margin-left: 4px; padding: 0 6px 0 8px; border-left: 1px solid #323a4a; font: 400 7px/1 "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; white-space: nowrap; }
+  .nx-sw-chan { display: inline-block; margin-left: 5px; padding: 2px 3px; border-radius: 3px; color: #111; background: #F1BE48; }
   `);
 
   const rendered = {};
@@ -1548,7 +1552,8 @@
     '<span class="nx-sw-mode" role="group" aria-label="Colour mode">' +
     '<button type="button" data-mode="day" title="Day mode" aria-label="Day mode">☀</button>' +
     '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>' +
-    `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION}">v${SCRIPT_VERSION}</span>`;
+    `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION} · ${CHANNEL} channel">v${SCRIPT_VERSION}` +
+    (CHANNEL === 'stable' ? '' : `<span class="nx-sw-chan">${CHANNEL.toUpperCase()}</span>`) + '</span>';
   document.body.appendChild(sw);
   $$('.nx-sw-mode button', sw).forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.mode === getMode()));
