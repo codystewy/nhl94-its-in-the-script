@@ -639,9 +639,15 @@
     .nx-prof span { color: var(--nx-mute); flex: none; }
     .nx-prof b { font-weight: 600; text-align: right; }
 
-    .nx-level + .nx-level { border-top: 0; margin-top: -1px; }
-    .nx-level { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); font-size: 12px; color: var(--nx-mute); white-space: nowrap; }
-    .nx-level select { flex: 1; min-width: 0; }
+    .nx-lgbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 22px; margin: -8px 0 16px; padding: 8px 14px;
+      background: var(--nx-card); border: 1px solid var(--nx-line); border-left: 4px solid var(--nx-red); border-radius: 8px; box-shadow: var(--nx-shadow); }
+    .nx-lgbar-f { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .nx-lgbar-f .nx-lab { margin: 0; font-size: 8px; color: var(--nx-mute); }
+    .nx-lgbar-f.lg { flex: 0 1 380px; }
+    .nx-lgbar-f.lg select { flex: 1; min-width: 0; font-weight: 600; }
+    .nx-lgbar-f select { min-height: 34px; font-size: 14px; }
+    @media (max-width: 760px) { .nx-lgbar { margin-top: 0; } }
+    @media (max-width: 560px) { .nx-lgbar-f.lg { flex-basis: 100%; } }
     .nx-dir-h { padding: 10px 16px 4px; font-family: var(--nx-px); font-size: 8px; color: var(--nx-acc); letter-spacing: .5px; }
     .nx-dir a { display: flex; align-items: center; gap: 10px; padding: 5px 16px; font-size: 13px; }
     .nx-dir a:hover { background: var(--nx-hover); }
@@ -694,13 +700,22 @@
     };
   }
 
-  // League card: season + level pickers and every team with its coach.
+  // League bar: season + level pickers under the top bar on every page, where the original site keeps its
+  // "League Selection" box. Seasons are listed newest first.
+  function v1LeagueBar() {
+    if (!leagueOpts.length && !levelOpts.length) return '';
+    const opts = (list) => list.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('');
+    return `<div class="nx-lgbar" role="group" aria-label="League selection">
+      ${leagueOpts.length ? `<label class="nx-lgbar-f lg"><span class="nx-lab">LEAGUE</span><select class="nx-lg-sel">${opts([...leagueOpts].reverse())}</select></label>` : ''}
+      ${levelOpts.length ? `<label class="nx-lgbar-f lv"><span class="nx-lab">LEVEL</span><select class="nx-level-sel">${opts(levelOpts)}</select></label>` : ''}
+    </div>`;
+  }
+
+  // League card: every team with its coach.
   function v1LeagueCard(highlightTeam) {
-    if (!divisions.length && !leagueOpts.length) return '';
+    if (!divisions.length) return '';
     return `
       <div class="nx-card"><div class="nx-card-h"><h2>League</h2>${levelName ? `<span class="nx-meta">${esc(levelName)}</span>` : ''}</div>
-        ${leagueOpts.length ? `<div class="nx-level">Season <select class="nx-lg-sel">${leagueOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
-        ${levelOpts.length ? `<div class="nx-level">Level <select class="nx-level-sel">${levelOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
         ${divisions.map((d) => `<div class="nx-dir"><div class="nx-dir-h">${esc(d.name.toUpperCase())}</div>
           ${d.teams.map((t) => `<a class="${t === highlightTeam ? 'me' : ''}" href="${esc(teamInfo[t].href)}">${logoImg(t)}<span class="n">${esc(t)}</span><span class="c">${esc(teamInfo[t].coach)}</span></a>`).join('')}
         </div>`).join('')}
@@ -1418,7 +1433,7 @@
     app.className = 'nx-root nx-v1';
     app.setAttribute('data-nx-theme', getMode());
     const chrome = v1Chrome();
-    app.innerHTML = chrome.head + `<main class="nx-main">${innerHtml}${chrome.foot}</main>`;
+    app.innerHTML = chrome.head + `<main class="nx-main">${v1LeagueBar()}${innerHtml}${chrome.foot}</main>`;
     document.body.appendChild(app);
     v1WirePickers(app);
     mlWire(app);
