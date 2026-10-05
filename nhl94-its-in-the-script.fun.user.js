@@ -1,0 +1,1597 @@
+// ==UserScript==
+// @name         NHL94 – It's In The Script (Fun)
+// @namespace    https://github.com/codystewy/nhl94-its-in-the-script
+// @version      1.4.1.23
+// @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
+// @author       codystewy
+// @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
+// @supportURL   https://github.com/codystewy/nhl94-its-in-the-script/issues
+// @updateURL    https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js
+// @downloadURL  https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js
+// @match        https://nhl94online.com/*
+// @match        http://nhl94online.com/*
+// @match        https://www.nhl94online.com/*
+// @match        http://www.nhl94online.com/*
+// @grant        GM_addStyle
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @run-at       document-idle
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  if (document.querySelector('.nx-root, .nx-switch')) return;
+
+  // Keep in sync with @version above (GM_info would report the dev loader's version).
+  const SCRIPT_VERSION = '1.4.1.23';
+  // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
+  const CHANNEL = 'fun';
+  const FUN = CHANNEL === 'fun';
+  // Fun-only extras: they run on the Fun channel only and never reach Latest or Stable.
+  // Gate each one with `if (funOn('id'))`. To retire one, delete its entry and every funOn('id') block.
+  // `/git summary` lists these with their age.
+  const FUN_EXTRAS = {
+    // id: { name: 'Custom scrollbars', added: 'YYYY-MM-DD' },
+  };
+  const funOn = (id) => FUN && Object.prototype.hasOwnProperty.call(FUN_EXTRAS, id);
+
+  // ============================================================
+  // Helpers
+  // ============================================================
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+  const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const leafTables = () => $$('table').filter((t) => !t.querySelector('table'));
+  const rowText = (r) => norm([...r.cells].map((c) => c.textContent).join(' '));
+  const firstRowText = (t) => (t.rows[0] ? rowText(t.rows[0]) : '');
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('nx:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('nx:' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  // Which page are we on? Pages without a redesign are left untouched.
+  const PATH = window.__nxTestPath || location.pathname; // __nxTestPath / __nxTestHref: set by dev/preview.sh only
+  const HREF = window.__nxTestHref || location.href;
+  const PAGE = /\/html\/coachpage\.php$/i.test(PATH) ? 'coach'
+    : /^\/(index\.php)?$/i.test(PATH) ? 'home'
+    : null;
+  if (!PAGE) return;
+
+  const params = new URLSearchParams(location.search);
+  const pageKey = params.get('team_ID') || location.search;
+
+  // City -> [logo slug, nickname] for the '94 teams (logos live at /images/gens/logosNN/<slug>.png)
+  const TEAMS = {
+    'Anaheim': ['ana_mighty_ducks', 'Mighty Ducks'], 'Boston': ['bos_bruins', 'Bruins'], 'Buffalo': ['buf_sabres', 'Sabres'],
+    'Calgary': ['cal_flames', 'Flames'], 'Chicago': ['chi_blackhawks', 'Blackhawks'], 'Dallas': ['dal_stars', 'Stars'],
+    'Detroit': ['det_red_wings', 'Red Wings'], 'Edmonton': ['edm_oilers', 'Oilers'], 'Florida': ['flo_panthers', 'Panthers'],
+    'Hartford': ['har_whalers', 'Whalers'], 'Los Angeles': ['los_kings', 'Kings'], 'Montreal': ['mon_canadiens', 'Canadiens'],
+    'New Jersey': ['new_devils', 'Devils'], 'NY Islanders': ['new_islanders', 'Islanders'], 'NY Rangers': ['new_rangers', 'Rangers'],
+    'Ottawa': ['ott_senators', 'Senators'], 'Philadelphia': ['phi_flyers', 'Flyers'], 'Pittsburgh': ['pit_penguins', 'Penguins'],
+    'Quebec': ['que_nordiques', 'Nordiques'], 'San Jose': ['san_sharks', 'Sharks'], 'St. Louis': ['st._blues', 'Blues'],
+    'St Louis': ['st._blues', 'Blues'], 'Tampa Bay': ['tam_lightning', 'Lightning'], 'Toronto': ['tor_maple_leafs', 'Maple Leafs'],
+    'Vancouver': ['van_canucks', 'Canucks'], 'Washington': ['was_capitals', 'Capitals'], 'Winnipeg': ['win_jets', 'Jets'],
+  };
+  const fullTeamName = (team) => {
+    if (!TEAMS[team]) return team;
+    const nick = TEAMS[team][1];
+    if (/^NY /.test(team)) return 'New York ' + nick;
+    return team + ' ' + nick;
+  };
+  const logo = (team, size = 20) => (TEAMS[team] ? `/images/gens/logos${size}/${TEAMS[team][0]}.png` : '');
+  const logoImg = (team, cls = 'nx-logo') =>
+    TEAMS[team] ? `<img class="${cls}" src="${logo(team, 20)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<span class="${cls}"></span>`;
+
+  // ============================================================
+  // 1. Scrape everything we need from the original page
+  // ============================================================
+
+  // Team -> { coach, href, division } from the left sidebar
+  const teamInfo = {};
+  const divisions = [];
+  leafTables().filter((t) => /Coach$/.test(firstRowText(t)) && t.rows.length > 2).forEach((t) => {
+    let div = null;
+    [...t.rows].forEach((r) => {
+      if (r.cells.length < 2) return;
+      const a = r.cells[0].querySelector('a');
+      if (!a) {
+        if (/Coach$/.test(rowText(r))) { div = { name: norm(r.cells[0].textContent), teams: [] }; divisions.push(div); }
+        return;
+      }
+      const name = norm(a.textContent);
+      teamInfo[name] = { coach: norm(r.cells[1].textContent), href: a.href, division: div ? div.name : '' };
+      if (div) div.teams.push(name);
+    });
+  });
+
+  // League / level selectors
+  const lgSel = $('select[name="lg"]');
+  const sublgSel = $('select[name="sublg"]');
+  const leagueOpts = lgSel ? [...lgSel.options].map((o) => ({ v: o.value, t: norm(o.text), sel: o.selected })) : [];
+  const levelOpts = sublgSel ? [...sublgSel.options].map((o) => ({ v: o.value, t: norm(o.text), sel: o.selected })) : [];
+  const leagueName = (leagueOpts.find((o) => o.sel) || {}).t || '';
+  const levelName = params.get('sublg') || (levelOpts.find((o) => o.sel) || {}).t || '';
+
+  // Header: coach + team
+  const headWhite = $('.heading_white');
+  const coachName = headWhite ? norm((headWhite.innerHTML.split(/<br\s*\/?>/i)[0] || '').replace(/<[^>]+>/g, '').replace(/^Coach:\s*/i, '')) : '';
+  const bigLogo = $$('img').find((i) => /logos100\//.test(i.getAttribute('src') || ''));
+  const teamFullName = bigLogo ? bigLogo.alt : '';
+
+  // Record block
+  const statVal = (label) => {
+    const lab = $$('.small_black_bold').find((s) => norm(s.textContent).replace(/:$/, '') === label);
+    return lab ? norm(lab.parentNode.textContent.replace(lab.textContent, '')) : '';
+  };
+  const stats = {
+    record: statVal('Record'), home: statVal('Home'), away: statVal('Away'), streak: statVal('Streak'),
+    gf: statVal('Goals For'), gfg: statVal('GF/G'), ga: statVal('Goals Against'), gag: statVal('GA/G'),
+  };
+  const rosterLink = $$('a').find((a) => /View Roster Stats/i.test(a.textContent));
+  const standingsLink = $$('a').find((a) => /View Full League Standings/i.test(a.textContent));
+
+  // Checkpoint line: "8 Games left to satisfy Checkpoint ( 1 ) by Oct. 12th, 2026."
+  let checkpoint = null;
+  const cpNode = $$('td, p').reverse().find((n) => /Games left to satisfy Checkpoint/i.test(n.textContent) && !n.querySelector('table'));
+  if (cpNode) {
+    const m = norm(cpNode.textContent).match(/(\d+)\s*Games left to satisfy Checkpoint\s*\(\s*(\d+)\s*\)\s*by\s*([^,]+,\s*\d{4})/i);
+    if (m) {
+      const due = new Date(m[3].replace(/\./g, '').replace(/(\d+)(st|nd|rd|th)/, '$1'));
+      const days = isNaN(due) ? null : Math.ceil((due - new Date(new Date().toDateString())) / 86400000);
+      checkpoint = { left: +m[1], num: m[2], dateText: m[3], days };
+    }
+  }
+
+  // User settings
+  const profile = [];
+  leafTables().filter((t) => /^Username:/.test(firstRowText(t))).forEach((t) => {
+    [...t.rows].forEach((r) => { if (r.cells.length >= 2) profile.push([norm(r.cells[0].textContent).replace(/:$/, ''), norm(r.cells[1].textContent)]); });
+  });
+
+  // The site isn't consistent with team names (e.g. "New York" in standings vs "NY Rangers"
+  // in the team list), so map any variant onto a known team, preferring the given division.
+  function resolveTeam(name, division) {
+    name = norm(name);
+    if (!name || teamInfo[name]) return name;
+    const key = (t) => t.toLowerCase().replace(/^ny\b/, 'new york').replace(/[^a-z]/g, '');
+    const want = key(name);
+    let cands = Object.keys(teamInfo).filter((t) => {
+      const k = key(t), full = key(fullTeamName(t));
+      return k === want || full === want || k.startsWith(want) || full.startsWith(want) || want.startsWith(k);
+    });
+    if (cands.length > 1 && division) {
+      const inDiv = cands.filter((t) => teamInfo[t].division === division);
+      if (inDiv.length) cands = inDiv;
+    }
+    return cands.length === 1 ? cands[0] : name;
+  }
+
+  // Division standings
+  let standings = null;
+  const stTable = leafTables().find((t) => /^\S+\s+W L T DNP Pts/.test(firstRowText(t)));
+  if (stTable) {
+    standings = { division: norm(stTable.rows[0].cells[0].textContent), rows: [] };
+    [...stTable.rows].slice(1).forEach((r) => {
+      const c = [...r.cells].map((x) => norm(x.textContent));
+      if (c.length >= 6) standings.rows.push({ team: resolveTeam(c[0], standings.division), w: c[1], l: c[2], t: c[3], dnp: c[4], pts: c[5] });
+    });
+  }
+
+  // Previous champions (top-right box on the original page)
+  const champs = [];
+  const champTitle = norm(($$('.bold_black').find((s) => /Champs/i.test(s.textContent)) || {}).textContent || '');
+  const champTable = leafTables().find((t) => t.querySelector('a[href*="coachpage"]') && /:\s*$/.test(norm((t.rows[0] && t.rows[0].cells[0] || {}).textContent || '')));
+  if (champTable) {
+    $$('td', champTable).forEach((td) => {
+      const a = td.querySelector('a');
+      if (!a) return;
+      const prev = td.previousElementSibling;
+      champs.push({ level: norm(prev ? prev.textContent : '').replace(/:$/, ''), coach: norm(a.textContent), href: a.href, img: (td.querySelector('img') || {}).src || '' });
+    });
+  }
+
+  // Nav menu
+  const nav = $('#nav');
+  const navItems = nav ? $$(':scope > li', nav).map((li) => {
+    const a = li.querySelector(':scope > a');
+    return {
+      text: norm(a ? a.textContent : ''), href: a ? a.getAttribute('href') : '#', target: a ? a.getAttribute('target') : '',
+      sub: $$(':scope > ul > li > a', li).map((s) => ({ text: norm(s.textContent), href: s.getAttribute('href'), target: s.getAttribute('target') })),
+    };
+  }) : [];
+
+  // Site footer links
+  const footLinks = $$('a.link5').filter((a) => !a.closest('#nav') && a.closest('table') && /Homepage|About|Rules|FAQs|Contact/i.test(a.closest('table').textContent))
+    .map((a) => ({ text: norm(a.textContent), href: a.getAttribute('href') }))
+    .filter((l, i, arr) => l.text && arr.findIndex((x) => x.text === l.text) === i && !/NHL94\.com|NHL94 Forums/i.test(l.text));
+
+  // ---------- Coach page ----------
+  // Schedule
+  const sched = leafTables().find((t) => /^Gm Away @ Home SCORE/i.test(firstRowText(t)));
+  const games = sched ? [...sched.rows].slice(1).filter((r) => r.cells.length >= 7).map((r) => {
+    const c = r.cells;
+    const logLink = c[4].querySelector('a');
+    const played = !logLink;
+    let score = '', winAbbr = '';
+    if (played) {
+      const span = c[4].querySelector('span');
+      winAbbr = span ? norm(span.textContent) : '';
+      score = norm(c[4].textContent.replace(winAbbr, ''));
+    }
+    const box = c[6].querySelector('a');
+    return {
+      gm: norm(c[0].textContent), away: norm(c[1].textContent), home: norm(c[3].textContent), played, score, winAbbr,
+      href: played ? (box ? box.href : '') : logLink.href, time: norm(c[5].textContent),
+    };
+  }) : [];
+
+  // Which team does this page belong to? (appears in every game)
+  let myTeam = '';
+  if (games.length) {
+    const counts = {};
+    games.forEach((g) => { counts[g.away] = (counts[g.away] || 0) + 1; counts[g.home] = (counts[g.home] || 0) + 1; });
+    myTeam = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  } else {
+    myTeam = Object.keys(teamInfo).find((k) => teamInfo[k].coach === coachName) || '';
+  }
+
+  // Winner abbreviation ("WPG", "LA", "NYR") -> which team
+  function abbrScore(abbr, name) {
+    const A = abbr.toUpperCase().replace(/[^A-Z]/g, '');
+    const N = name.toUpperCase().replace(/[^A-Z ]/g, '');
+    if (!A || A[0] !== N[0]) return 0;
+    let i = 0;
+    for (const ch of N) if (ch === A[i]) i++;
+    if (i < A.length) return 0;
+    const initials = N.split(' ').map((w) => w[0]).join('');
+    return initials === A ? 3 : N.replace(/ /g, '').startsWith(A) ? 2 : 1;
+  }
+  games.forEach((g) => {
+    g.opp = g.away === myTeam ? g.home : g.away;
+    g.isHome = g.home === myTeam;
+    g.result = '';
+    if (!g.played) return;
+    if (!g.winAbbr) { g.result = 'T'; return; }
+    g.result = abbrScore(g.winAbbr, myTeam) >= abbrScore(g.winAbbr, g.opp) ? 'W' : 'L';
+  });
+
+  // Group by opponent, in order of first appearance
+  const groups = [...new Set(games.map((g) => g.opp))].map((o) => {
+    const gs = games.filter((g) => g.opp === o);
+    return {
+      opp: o, games: gs,
+      w: gs.filter((g) => g.result === 'W').length, l: gs.filter((g) => g.result === 'L').length, t: gs.filter((g) => g.result === 'T').length,
+      left: gs.filter((g) => !g.played).length,
+    };
+  });
+  const playedCount = games.filter((g) => g.played).length;
+
+  // Division rank of this team
+  let rank = null;
+  if (standings) {
+    const i = standings.rows.findIndex((r) => r.team === myTeam);
+    if (i >= 0) rank = { pos: i + 1, pts: standings.rows[i].pts };
+  }
+  const ordinal = (n) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+
+  const addCss = (css) => {
+    if (typeof GM_addStyle === 'function') GM_addStyle(css);
+    else { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }
+  };
+
+  // ============================================================
+  // Colour palettes: team colours on coach pages, the original site's red/white/blue on home.
+  // Readable text colours are computed so any team works in Day and Night mode.
+  // ============================================================
+  // City -> [primary, secondary] (1993-94 era colours)
+  const TEAM_COLORS = {
+    'Anaheim': ['#4E2A84', '#00877C'], 'Boston': ['#111111', '#FFB81C'], 'Buffalo': ['#00338D', '#FDBB30'],
+    'Calgary': ['#C8102E', '#F1BE48'], 'Chicago': ['#CF0A2C', '#E8E8E8'], 'Dallas': ['#006341', '#C4A15A'],
+    'Detroit': ['#CE1126', '#E8E8E8'], 'Edmonton': ['#00205B', '#FC4C02'], 'Florida': ['#C8102E', '#B9975B'],
+    'Hartford': ['#003DA5', '#00A651'], 'Los Angeles': ['#111111', '#A2AAAD'], 'Montreal': ['#AF1E2D', '#4A6FE3'],
+    'New Jersey': ['#CE1126', '#E8E8E8'], 'NY Islanders': ['#00539B', '#F47D30'], 'NY Rangers': ['#0038A8', '#CE1126'],
+    'Ottawa': ['#C52032', '#C2912C'], 'Philadelphia': ['#F74902', '#E8E8E8'], 'Pittsburgh': ['#111111', '#FCB514'],
+    'Quebec': ['#00539F', '#E4002B'], 'San Jose': ['#006D75', '#A2AAAD'], 'St. Louis': ['#002F87', '#FCB514'],
+    'St Louis': ['#002F87', '#FCB514'], 'Tampa Bay': ['#002868', '#A2AAAD'], 'Toronto': ['#00205B', '#E8E8E8'],
+    'Vancouver': ['#A6192E', '#FFB81C'], 'Washington': ['#C8102E', '#6E8FD6'], 'Winnipeg': ['#003DA5', '#CE1126'],
+  };
+  const hexRgb = (h) => { h = h.replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+  const lum = (h) => { const [r, g, b] = hexRgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const contrast = (a, b) => { const x = lum(a) + 0.05, y = lum(b) + 0.05; return x > y ? x / y : y / x; };
+  const mixHex = (a, b, t) => '#' + hexRgb(a).map((v, i) => Math.round(v * (1 - t) + hexRgb(b)[i] * t).toString(16).padStart(2, '0')).join('');
+  const onColor = (bg) => (contrast(bg, '#ffffff') >= contrast(bg, '#111111') ? '#fff' : '#111');
+  // Nudge a colour toward white (on dark) or black (on light) until it reads as text on that background.
+  function readableOn(bg, color, min) {
+    const target = lum(bg) < 0.2 ? '#ffffff' : '#000000';
+    let c = color;
+    for (let t = 0.1; t <= 1.0001 && contrast(c, bg) < min; t += 0.1) c = mixHex(color, target, t);
+    return c;
+  }
+  function makePalette(hero, btn, gold, acc = {}) {
+    return {
+      '--nx-hero1': hero, '--nx-red': btn, '--nx-on-red': onColor(btn),
+      '--nx-gold': gold, '--nx-on-gold': onColor(gold),
+      '--nx-acc-n': acc.n || readableOn('#141C2F', gold, 4.5),
+      '--nx-acc-d': acc.d || readableOn('#FFFFFF', gold, 4.5),
+    };
+  }
+  // Home: the original site's royal blue, dark red and yellow (links stay the site's blue in Day mode).
+  const HOME_PALETTE = makePalette('#3366CC', '#9B0000', '#FFCC00', { n: '#FFCC00', d: '#2A57B0' });
+  function teamPalette(team) {
+    const c = TEAM_COLORS[team];
+    if (!c) return HOME_PALETTE;
+    const [p, s] = c;
+    return makePalette(p, lum(p) < 0.01 ? s : p, s); // near-black teams (Bruins, Kings, Penguins) use their 2nd colour for buttons
+  }
+  const applyPalette = (el, vars) => Object.entries(vars).forEach(([k, v]) => el.style.setProperty(k, v));
+
+  // Day / Night mode, shared by every page (Night is the default).
+  const getMode = () => (store.get('theme', 'night') === 'day' ? 'day' : 'night');
+  function setMode(mode) {
+    store.set('theme', mode);
+    $$('.nx-v1').forEach((el) => el.setAttribute('data-nx-theme', mode));
+    $$('.nx-sw-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  }
+
+  // ============================================================
+  // VERSION 1 — "Rink Night": dark NHL 26 broadcast look with 16-bit touches
+  // ============================================================
+  let v1Ready = false;
+  function v1Setup() {
+    if (v1Ready) return;
+    v1Ready = true;
+    const fonts = document.createElement('link');
+    fonts.rel = 'stylesheet';
+    fonts.href = 'https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap';
+    document.head.appendChild(fonts);
+
+    const css = `
+    :root { --nx-px: "Press Start 2P", monospace; --nx-cond: Oswald, "Arial Narrow", sans-serif; --nx-ui: Inter, "Segoe UI", system-ui, sans-serif; }
+
+    /* ===== Theme tokens =====
+       Accents come per page from JS (team colors on coach pages, red/white/blue on home):
+         --nx-hero1 hero colour · --nx-red button/active fill (+ --nx-on-red text) · --nx-gold highlight fill (+ --nx-on-gold)
+         --nx-acc-n / --nx-acc-d highlight as readable TEXT on night / day surfaces.
+       Surfaces come from the Day / Night mode (data-nx-theme on the root). */
+    .nx-v1 {
+      --nx-hero1: #C8102E; --nx-red: #C8102E; --nx-red-d: #8E0C21; --nx-on-red: #fff; --nx-gold: #F1BE48; --nx-on-gold: #111;
+      --nx-acc-n: #F1BE48; --nx-acc-d: #8A6512;
+      --nx-win: #2ecc71; --nx-loss: #ff4d5e; --nx-tie: #f1be48;
+      --nx-hero2: color-mix(in srgb, var(--nx-hero1) 62%, #000); --nx-hero3: color-mix(in srgb, var(--nx-hero1) 22%, #05070d);
+    }
+    .nx-v1, .nx-v1[data-nx-theme="night"] {
+      --nx-bg: #0B1020; --nx-bg2: #10172A; --nx-card: #141C2F; --nx-card2: #1A2440; --nx-line: #232E48; --nx-line2: #314166;
+      --nx-text: #EEF2F8; --nx-mute: #A0ABC3; --nx-dim: #6F7B95; --nx-strong: #fff; --nx-acc: var(--nx-acc-n);
+      --nx-thead: #0F1628; --nx-row-home: rgba(255,255,255,.035); --nx-row-away: rgba(0,0,0,.30); --nx-grp1: #1C2640; --nx-score: #070B16;
+      --nx-hover: color-mix(in srgb, var(--nx-gold) 11%, transparent); --nx-me: color-mix(in srgb, var(--nx-red) 26%, transparent);
+      --nx-cardh: linear-gradient(90deg, color-mix(in srgb, var(--nx-hero1) 30%, transparent), transparent 72%); --nx-cardh-text: #fff; --nx-cardh-meta: var(--nx-mute); --nx-cardh-line: var(--nx-line);
+      --nx-shadow: 0 10px 30px rgba(0,0,0,.35);
+      --nx-page: radial-gradient(1200px 500px at 15% -10%, color-mix(in srgb, var(--nx-hero1) 30%, transparent), transparent 60%),
+                 radial-gradient(900px 400px at 100% 0%, color-mix(in srgb, var(--nx-gold) 9%, transparent), transparent 60%),
+                 linear-gradient(180deg, #0D1326 0%, #0B1020 420px);
+    }
+    .nx-v1[data-nx-theme="day"] {
+      --nx-bg: #E5EEF6; --nx-bg2: #EEF4FA; --nx-card: #FFFFFF; --nx-card2: #F2F7FC; --nx-line: #D3E2EA; --nx-line2: #B4C8DD;
+      --nx-text: #1E1E1E; --nx-mute: #4A5A70; --nx-dim: #75839A; --nx-strong: #111; --nx-acc: var(--nx-acc-d);
+      --nx-thead: #F2F7FC; --nx-row-home: #FFFFFF; --nx-row-away: #EDF2F8; --nx-grp1: #E3EBF5; --nx-score: #1E1E1E;
+      --nx-hover: color-mix(in srgb, var(--nx-hero1) 8%, #fff); --nx-me: color-mix(in srgb, var(--nx-hero1) 16%, #fff);
+      --nx-cardh: linear-gradient(180deg, color-mix(in srgb, var(--nx-hero1) 72%, #fff), var(--nx-hero1)); --nx-cardh-text: #fff; --nx-cardh-meta: rgba(255,255,255,.85);
+      --nx-cardh-line: color-mix(in srgb, var(--nx-hero1) 70%, #000);
+      --nx-shadow: 0 2px 10px rgba(30,60,110,.10);
+      --nx-page: url(/images/bg.gif) repeat-x fixed, #6699CC; /* the original site's own background: white fading to steel blue */
+    }
+
+    .nx-v1, .nx-v1 * { box-sizing: border-box; }
+    .nx-v1 { font-family: var(--nx-ui); font-size: 14px; color: var(--nx-text); min-height: 100vh; line-height: 1.4; text-align: left; background: var(--nx-page); }
+    .nx-v1 a { color: inherit; text-decoration: none; }
+    .nx-v1 img { border: 0; }
+    .nx-v1 select { font: inherit; font-size: 13px; color: var(--nx-text); background-color: var(--nx-card2); border: 1px solid var(--nx-line2);
+      border-radius: 6px; padding: 6px 28px 6px 10px; cursor: pointer; appearance: none; -webkit-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--nx-acc) 50%), linear-gradient(135deg, var(--nx-acc) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
+    .nx-v1 select:focus-visible, .nx-v1 button:focus-visible, .nx-v1 a:focus-visible, .nx-v1 input:focus-visible { outline: 2px solid var(--nx-acc); outline-offset: 2px; }
+
+    /* ---------- Ticker + top bar (dark in both modes, like the original site's black menu bar) ---------- */
+    .nx-ticker { display: flex; align-items: center; height: 30px; background: #05070D; border-bottom: 1px solid #1b2236; overflow: hidden; font-size: 12px; }
+    .nx-ticker-tag { flex: none; height: 100%; display: flex; align-items: center; padding: 0 18px 0 12px; background: var(--nx-gold); color: var(--nx-on-gold);
+      font-family: var(--nx-px); font-size: 8px; letter-spacing: .5px; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); position: relative; z-index: 1; }
+    .nx-ticker-track { display: flex; gap: 28px; white-space: nowrap; padding-left: 20px; animation: nx-scroll 45s linear infinite; }
+    .nx-ticker:hover .nx-ticker-track { animation-play-state: paused; }
+    .nx-ticker-item { display: inline-flex; align-items: center; gap: 6px; color: #98A6BF; }
+    .nx-ticker-item b { color: #fff; font-weight: 600; }
+    .nx-ticker-item img { width: 18px; height: 18px; image-rendering: pixelated; }
+    .nx-ticker-item a:hover b { color: var(--nx-acc-n); }
+    @keyframes nx-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) { .nx-ticker-track { animation: none; } }
+
+    .nx-top { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 18px; padding: 0 24px; height: 58px;
+      background: rgba(10,13,24,.94); backdrop-filter: blur(10px); border-bottom: 3px solid var(--nx-red); color: #fff; }
+    .nx-brand { display: flex; align-items: baseline; gap: 8px; flex: none; }
+    .nx-brand-a { font-family: var(--nx-px); font-size: 15px; color: #fff; text-shadow: 3px 3px 0 var(--nx-red); letter-spacing: 1px; }
+    .nx-brand-b { font-family: var(--nx-px); font-size: 9px; color: var(--nx-acc-n); }
+    .nx-nav { display: flex; align-items: stretch; height: 100%; flex: 1; min-width: 0; justify-content: flex-end; order: 2; }
+    .nx-nav > div { position: relative; display: flex; }
+    .nx-nav > div > a { display: flex; align-items: center; padding: 0 11px; font-family: var(--nx-cond); font-weight: 500; font-size: 14px;
+      text-transform: uppercase; letter-spacing: .6px; color: #B9C4D8; border-bottom: 3px solid transparent; margin-bottom: -3px; white-space: nowrap; }
+    .nx-nav > div:hover > a, .nx-nav > div:focus-within > a { color: #fff; border-bottom-color: var(--nx-gold); }
+    .nx-nav .nx-sub { display: none; position: absolute; top: 100%; left: 0; min-width: 220px; padding: 6px; background: var(--nx-card);
+      border: 1px solid var(--nx-line2); border-top: 2px solid var(--nx-red); border-radius: 0 0 8px 8px; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+    .nx-nav > div:hover .nx-sub, .nx-nav > div:focus-within .nx-sub { display: block; }
+    .nx-sub a { display: block; padding: 7px 10px; border-radius: 5px; color: var(--nx-text); font-size: 13px; }
+    .nx-sub a:hover { background: var(--nx-card2); color: var(--nx-acc); }
+    .nx-sub .nx-sub-h { padding: 8px 10px 4px; font-family: var(--nx-px); font-size: 7px; color: var(--nx-dim); letter-spacing: .5px; }
+    .nx-topbtn { display: inline-flex; align-items: center; gap: 7px; font: 600 14px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase;
+      color: #fff; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.18); border-radius: 6px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+    .nx-topbtn:hover, .nx-topbtn[aria-expanded="true"] { border-color: var(--nx-acc-n); color: var(--nx-acc-n); }
+    .nx-menu-btn { display: none; order: 5; }
+
+    /* ---------- Layout ---------- */
+    .nx-main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 60px; }
+    .nx-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; margin-top: 22px; }
+    @media (max-width: 1100px) { .nx-grid { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 1360px) { .nx-nav > div > a { padding: 0 7px; font-size: 13px; letter-spacing: .3px; } .nx-top { gap: 12px; padding: 0 16px; } }
+    @media (max-width: 1240px) {
+      .nx-menu-btn { display: inline-flex; }
+      .nx-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; height: auto; flex-direction: column; align-items: stretch; justify-content: flex-start;
+        max-height: calc(100vh - 58px); overflow-y: auto; padding: 8px 16px 16px; background: var(--nx-card); border-bottom: 2px solid var(--nx-red);
+        box-shadow: 0 20px 40px rgba(0,0,0,.45); }
+      .nx-nav.open { display: flex; }
+      .nx-nav > div { flex-direction: column; }
+      .nx-nav > div > a { padding: 12px 6px; margin: 0; font-size: 15px; color: var(--nx-text); border-bottom: 1px solid var(--nx-line); }
+      .nx-nav > div:hover > a, .nx-nav > div:focus-within > a { color: var(--nx-acc); border-bottom-color: var(--nx-line); }
+      .nx-nav .nx-sub { display: block; position: static; min-width: 0; padding: 2px 0 6px 12px; background: none; border: 0; box-shadow: none; }
+      .nx-ml { margin-left: auto; }
+    }
+    @media (max-width: 760px) { .nx-main { padding: 14px; } .nx-top { gap: 8px; padding: 0 10px; } .nx-brand-b { display: none; } }
+
+    /* ---------- Hero (always a saturated colour band, white text, in both modes) ---------- */
+    .nx-hero { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--nx-hero1) 55%, #000);
+      background: linear-gradient(105deg, var(--nx-hero1) 0%, var(--nx-hero2) 42%, var(--nx-hero3) 72%, #06080f 100%); box-shadow: var(--nx-shadow); color: #fff; }
+    .nx-hero::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px); }
+    .nx-hero-in::after { content: ""; position: absolute; z-index: -1; right: -130px; top: 0; bottom: 0; width: 340px; pointer-events: none;
+      background: linear-gradient(100deg, transparent 0 30%, var(--nx-gold) 30% 34%, transparent 34% 44%, color-mix(in srgb, var(--nx-gold) 45%, transparent) 44% 46%, transparent 46%); opacity: .85; }
+    .nx-hero-in { position: relative; z-index: 1; isolation: isolate; overflow: hidden; display: flex; align-items: center; gap: 28px; padding: 26px 30px 22px; }
+    .nx-hero-logo { flex: none; width: 128px; height: 128px; display: grid; place-items: center; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,.2), rgba(0,0,0,.25) 70%); box-shadow: 0 0 0 3px var(--nx-gold), 0 0 40px color-mix(in srgb, var(--nx-gold) 30%, transparent); }
+    .nx-hero-logo img { width: 100px; height: 100px; image-rendering: pixelated; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
+    .nx-hero-txt { min-width: 0; flex: 1; }
+    .nx-eyebrow { display: inline-flex; gap: 8px; align-items: center; font-family: var(--nx-px); font-size: 8px; letter-spacing: .5px; color: var(--nx-acc-n);
+      background: rgba(0,0,0,.38); padding: 6px 10px; border-radius: 3px; line-height: 1.6; }
+    .nx-team { margin: 10px 0 2px; font-family: var(--nx-cond); font-weight: 700; font-size: clamp(34px, 5vw, 58px); line-height: .95;
+      text-transform: uppercase; letter-spacing: 1px; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.35); }
+    .nx-coach { font-family: var(--nx-cond); font-size: 18px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.82); }
+    .nx-coach b { color: var(--nx-acc-n); font-weight: 600; }
+    .nx-hero-rank { flex: none; text-align: center; padding: 14px 20px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.14);
+      border-radius: 10px; margin-right: 120px; }
+    .nx-hero-rank .big { font-family: var(--nx-px); font-size: 24px; color: #fff; text-shadow: 3px 3px 0 rgba(0,0,0,.55); }
+    .nx-hero-rank .lab { font-family: var(--nx-cond); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--nx-acc-n); margin-top: 8px; }
+    @media (max-width: 900px) { .nx-hero-rank { margin-right: 0; } .nx-hero-in::after { display: none; } }
+    @media (max-width: 640px) {
+      .nx-hero-in { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
+      .nx-hero-txt { width: 100%; }
+      .nx-hero-rank { align-self: stretch; margin: 0; }
+      .nx-hero-logo { width: 88px; height: 88px; } .nx-hero-logo img { width: 70px; height: 70px; }
+      table.nx-sched td, table.nx-sched th { padding-left: 6px; padding-right: 6px; }
+      table.nx-sched td.tm { white-space: normal; font-size: 11px; }
+      .nx-go { min-width: 0; }
+      .nx-cp-bar { min-width: 100%; order: 5; }
+    }
+
+    .nx-statbar { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      background: rgba(0,0,0,.5); border-top: 1px solid rgba(255,255,255,.1); }
+    .nx-stat { padding: 10px 14px; border-right: 1px solid rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.05); }
+    .nx-stat:last-child { border-right: 0; }
+    .nx-stat .k { font-family: var(--nx-cond); font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; color: rgba(255,255,255,.62); }
+    .nx-stat .v { font-family: var(--nx-cond); font-weight: 600; font-size: 22px; color: #fff; font-variant-numeric: tabular-nums; }
+    .nx-stat .v.pos { color: var(--nx-win); } .nx-stat .v.neg { color: var(--nx-loss); }
+
+    .nx-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .nx-btn { display: inline-flex; align-items: center; padding: 8px 16px; font-family: var(--nx-cond); font-weight: 600; font-size: 14px;
+      text-transform: uppercase; letter-spacing: 1px; color: #fff !important; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.25);
+      transform: skewX(-12deg); border-radius: 3px; cursor: pointer; transition: background .15s, border-color .15s; }
+    .nx-btn > span { display: inline-block; transform: skewX(12deg); }
+    .nx-btn:hover { background: rgba(0,0,0,.55); border-color: var(--nx-gold); }
+    .nx-btn.gold { background: var(--nx-gold); border-color: var(--nx-gold); color: var(--nx-on-gold) !important; }
+    .nx-btn.gold:hover { filter: brightness(1.08); }
+    button.nx-btn { font-family: var(--nx-cond); }
+
+    /* ---------- Cards ---------- */
+    .nx-card { background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: 12px; overflow: clip; box-shadow: var(--nx-shadow); }
+    .nx-card + .nx-card { margin-top: 18px; }
+    .nx-card-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px;
+      background: var(--nx-cardh); border-bottom: 2px solid var(--nx-cardh-line); }
+    .nx-card-h h2 { margin: 0; font-family: var(--nx-cond); font-weight: 600; font-size: 18px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--nx-cardh-text);
+      display: flex; align-items: center; gap: 12px; text-shadow: 0 1px 0 rgba(0,0,0,.2); }
+    .nx-card-h h2::before { content: ""; width: 4px; height: 18px; background: var(--nx-red); box-shadow: 5px 0 0 var(--nx-gold); }
+    .nx-card-h .nx-meta { font-size: 12px; color: var(--nx-cardh-meta); }
+    .nx-card-h .nx-link { font-size: 12px; color: var(--nx-cardh-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+    /* ---------- Checkpoint ---------- */
+    .nx-cp { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); background: var(--nx-bg2); }
+    .nx-cp-num { font-family: var(--nx-px); font-size: 20px; color: var(--nx-acc); }
+    .nx-cp-txt { font-size: 13px; color: var(--nx-mute); }
+    .nx-cp-txt b { color: var(--nx-text); }
+    .nx-cp-bar { flex: 1; min-width: 160px; height: 10px; background: var(--nx-score); border: 1px solid var(--nx-line2); border-radius: 2px; overflow: hidden; }
+    .nx-cp-bar > i { display: block; height: 100%; background: repeating-linear-gradient(90deg, var(--nx-gold) 0 8px, color-mix(in srgb, var(--nx-gold) 70%, #000) 8px 10px); }
+    .nx-cp-due { font-family: var(--nx-cond); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; padding: 3px 10px; border-radius: 3px; background: var(--nx-card2); }
+    .nx-cp.urgent .nx-cp-num { color: var(--nx-loss); }
+    .nx-cp.urgent .nx-cp-due { background: var(--nx-loss); color: #fff; }
+    .nx-cp.done .nx-cp-num { color: var(--nx-win); }
+
+    /* ---------- Schedule controls ---------- */
+    .nx-ctrl { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); }
+    .nx-ctrl-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .nx-seg { display: inline-flex; background: var(--nx-bg2); border: 1px solid var(--nx-line2); border-radius: 6px; padding: 2px; }
+    .nx-seg button { font: 600 12px var(--nx-cond); text-transform: uppercase; letter-spacing: 1px; color: var(--nx-mute); background: none; border: 0;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer; }
+    .nx-seg button:hover { color: var(--nx-strong); }
+    .nx-seg button.on { background: var(--nx-red); color: var(--nx-on-red); }
+    .nx-seg button .n { opacity: .65; margin-left: 5px; }
+    .nx-lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-dim); letter-spacing: .5px; margin-right: 4px; }
+    .nx-pill { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 999px; padding: 3px 11px 3px 4px; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s; }
+    .nx-pill .nx-logo { width: 20px; height: 20px; image-rendering: pixelated; }
+    .nx-pill small { color: var(--nx-dim); font-size: 11px; }
+    .nx-pill:hover { border-color: var(--nx-acc); }
+    .nx-pill.on { background: var(--nx-red); color: var(--nx-on-red); border-color: var(--nx-gold); box-shadow: inset 0 0 0 1px var(--nx-gold); }
+    .nx-pill.on small { color: inherit; opacity: .75; }
+    .nx-clear { font: 600 12px var(--nx-ui); color: var(--nx-acc); background: none; border: 0; cursor: pointer; padding: 3px 6px; }
+    .nx-clear[hidden] { display: none; }
+
+    /* ---------- Schedule table ---------- */
+    table.nx-sched { border-collapse: collapse; width: 100%; font-size: 13px; }
+    table.nx-sched th { position: sticky; top: 58px; z-index: 2; background: var(--nx-thead); color: var(--nx-mute); text-align: left;
+      font: 500 11px var(--nx-cond); text-transform: uppercase; letter-spacing: 1.3px; padding: 8px 12px; border-bottom: 2px solid var(--nx-red); white-space: nowrap; }
+    table.nx-sched td { padding: 6px 12px; border-bottom: 1px solid var(--nx-line); white-space: nowrap; }
+    table.nx-sched td.gm { width: 1%; font-family: var(--nx-px); font-size: 8px; color: var(--nx-dim); text-align: center; }
+    table.nx-sched td.act, table.nx-sched td.ha, table.nx-sched td.sc, table.nx-sched td.rs { width: 1%; }
+    table.nx-sched td.sc { text-align: right; font-family: var(--nx-cond); font-size: 16px; font-weight: 600; color: var(--nx-strong); font-variant-numeric: tabular-nums; }
+    table.nx-sched td.rs { text-align: center; }
+    table.nx-sched td.tm { color: var(--nx-mute); font-size: 12px; }
+    table.nx-sched tr.g-row.home td { background: var(--nx-row-home); }
+    table.nx-sched tr.g-row.away td { background: var(--nx-row-away); }
+    table.nx-sched tr.g-row:hover td { background: var(--nx-hover); }
+
+    tr.nx-grp td { padding: 0; border-bottom: 1px solid var(--nx-line2); background: linear-gradient(90deg, var(--nx-grp1), var(--nx-card) 65%); }
+    tr.nx-grp:not(:first-child) td { border-top: 6px solid var(--nx-card); }
+    .nx-grp-in { display: flex; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer; user-select: none; }
+    .nx-grp-in .nx-logo { width: 30px; height: 30px; image-rendering: pixelated; flex: none; }
+    .nx-grp-name { font-family: var(--nx-cond); font-size: 17px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--nx-strong); line-height: 1.2; }
+    .nx-grp-name a:hover { color: var(--nx-acc); }
+    .nx-grp-coach { font-size: 12px; color: var(--nx-acc); font-weight: 600; }
+    .nx-grp-div { font-size: 11px; color: var(--nx-dim); }
+    .nx-grp-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .nx-pips { display: inline-flex; gap: 3px; }
+    .nx-pips i { width: 10px; height: 10px; background: var(--nx-bg2); border: 1px solid var(--nx-line2); }
+    .nx-pips i.W { background: var(--nx-win); border-color: var(--nx-win); }
+    .nx-pips i.L { background: var(--nx-loss); border-color: var(--nx-loss); }
+    .nx-pips i.T { background: var(--nx-tie); border-color: var(--nx-tie); }
+    .nx-grp-rec { font-family: var(--nx-cond); font-size: 15px; font-weight: 600; min-width: 44px; text-align: right; color: var(--nx-strong); font-variant-numeric: tabular-nums; }
+    .nx-grp-left { font-size: 11px; color: var(--nx-mute); min-width: 54px; text-align: right; }
+    .nx-grp-left.done { color: var(--nx-win); }
+    .nx-chev { width: 10px; color: var(--nx-dim); transition: transform .15s; font-size: 10px; }
+    tr.nx-grp.collapsed .nx-chev { transform: rotate(-90deg); }
+    @media (max-width: 640px) { .nx-pips { display: none; } .nx-grp-div { display: none; } }
+
+    .nx-ha { display: inline-block; font: 600 10px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; }
+    .nx-ha.h { background: var(--nx-card2); color: var(--nx-strong); border: 1px solid var(--nx-line2); }
+    .nx-ha.a { color: var(--nx-mute); border: 1px dashed var(--nx-line2); }
+    .nx-res { display: inline-grid; place-items: center; width: 24px; height: 24px; font-family: var(--nx-px); font-size: 9px; border-radius: 3px; }
+    .nx-res.W { background: var(--nx-win); color: #062b15; } .nx-res.L { background: var(--nx-loss); color: #3a040b; } .nx-res.T { background: var(--nx-tie); color: #3a2a04; }
+    .nx-go { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; padding: 4px 10px; font: 600 11px var(--nx-cond); text-transform: uppercase;
+      letter-spacing: 1px; border-radius: 3px; transform: skewX(-12deg); }
+    .nx-go > span { display: inline-block; transform: skewX(12deg); }
+    .nx-go.log { background: var(--nx-red); color: var(--nx-on-red) !important; }
+    .nx-go.log:hover { filter: brightness(1.15); }
+    .nx-go.box { color: var(--nx-acc) !important; border: 1px solid color-mix(in srgb, var(--nx-acc) 55%, transparent); }
+    .nx-go.box:hover { background: color-mix(in srgb, var(--nx-acc) 14%, transparent); }
+    .nx-empty { padding: 30px; text-align: center; color: var(--nx-mute); }
+
+    /* ---------- Sidebar ---------- */
+    table.nx-st { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.nx-st th { font: 500 11px var(--nx-cond); text-transform: uppercase; letter-spacing: 1.2px; color: var(--nx-mute); padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--nx-line2); }
+    table.nx-st th:nth-child(2) { text-align: left; }
+    table.nx-st td { padding: 6px; border-bottom: 1px solid var(--nx-line); text-align: right; font-variant-numeric: tabular-nums; }
+    table.nx-st td.pos { text-align: center; font-family: var(--nx-px); font-size: 8px; color: var(--nx-dim); width: 24px; }
+    table.nx-st td.tm { text-align: left; }
+    table.nx-st td.pts { font-family: var(--nx-cond); font-weight: 600; font-size: 15px; color: var(--nx-strong); padding-right: 12px; }
+    table.nx-st tr.me td { background: var(--nx-me); }
+    table.nx-st tr.me td.pos { color: var(--nx-acc); }
+    table.nx-st tbody tr:hover td { background: var(--nx-hover); }
+    .nx-tmcell { display: flex; align-items: center; gap: 8px; }
+    .nx-tmcell .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+    .nx-tmcell .n { font-weight: 600; color: var(--nx-text); line-height: 1.2; }
+    .nx-tmcell .c { font-size: 11px; color: var(--nx-mute); line-height: 1.2; }
+    .nx-tmcell:hover .n { color: var(--nx-acc); }
+
+    .nx-prof { padding: 4px 16px 10px; }
+    .nx-prof div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--nx-line); font-size: 13px; }
+    .nx-prof div:last-child { border-bottom: 0; }
+    .nx-prof span { color: var(--nx-mute); flex: none; }
+    .nx-prof b { font-weight: 600; text-align: right; }
+
+    .nx-level + .nx-level { border-top: 0; margin-top: -1px; }
+    .nx-level { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); font-size: 12px; color: var(--nx-mute); white-space: nowrap; }
+    .nx-level select { flex: 1; min-width: 0; }
+    .nx-dir-h { padding: 10px 16px 4px; font-family: var(--nx-px); font-size: 8px; color: var(--nx-acc); letter-spacing: .5px; }
+    .nx-dir a { display: flex; align-items: center; gap: 10px; padding: 5px 16px; font-size: 13px; }
+    .nx-dir a:hover { background: var(--nx-hover); }
+    .nx-dir a:hover .n { color: var(--nx-acc); }
+    .nx-dir a.me { background: var(--nx-me); }
+    .nx-dir .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; flex: none; }
+    .nx-dir .n { flex: 1; font-weight: 500; }
+    .nx-dir .c { color: var(--nx-mute); font-size: 12px; }
+
+    .nx-foot { margin-top: 30px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+      color: var(--nx-mute); font-size: 12px; border-top: 1px solid var(--nx-line2); padding-top: 16px; }
+    .nx-v1[data-nx-theme="day"] .nx-foot { color: #1B2F55; }
+    .nx-foot-links { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; }
+    .nx-foot-links a:hover { color: var(--nx-strong); text-decoration: underline; }
+    .nx-foot .nx-px { font-family: var(--nx-px); font-size: 8px; color: var(--nx-red); animation: nx-blink 1.2s steps(2) infinite; }
+    .nx-v1[data-nx-theme="night"] .nx-foot .nx-px { color: var(--nx-acc); }
+    @keyframes nx-blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .nx-foot .nx-px { animation: none; } }
+    `;
+    addCss(css);
+  }
+
+  // Shared V1 site chrome: champions ticker + sticky top bar, and the footer.
+  function v1Chrome() {
+    const tickerItems = champs.map((c) =>
+      `<span class="nx-ticker-item">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}${esc(c.level)} <a href="${esc(c.href)}"><b>${esc(c.coach)}</b></a></span>`).join('');
+
+    const navHtml = navItems.map((n) => {
+      const sub = n.sub.length ? `<div class="nx-sub">${n.sub.map((s) => /^-{2,}/.test(s.text)
+        ? `<div class="nx-sub-h">${esc(s.text.replace(/-/g, '').trim().toUpperCase())}</div>`
+        : `<a href="${esc(s.href)}"${s.target ? ` target="${esc(s.target)}"` : ''}>${esc(s.text)}</a>`).join('')}</div>` : '';
+      return `<div><a href="${esc(n.href)}"${n.target ? ` target="${esc(n.target)}"` : ''}>${esc(n.text)}${n.sub.length ? '&nbsp;▾' : ''}</a>${sub}</div>`;
+    }).join('');
+
+    return {
+      head: `
+      ${champs.length ? `<div class="nx-ticker"><div class="nx-ticker-tag">${esc((champTitle || 'Champions').toUpperCase())}</div>
+        <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
+      <header class="nx-top">
+        <a class="nx-brand" href="/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
+        <div class="nx-ml"><button type="button" class="nx-topbtn nx-ml-btn" aria-expanded="false" aria-haspopup="true" title="Your teams in each league"><span class="nx-star">★</span><span class="lbl">My Leagues</span><span class="nx-ml-count"></span></button><div class="nx-ml-menu" hidden></div></div>
+        <button type="button" class="nx-topbtn nx-menu-btn" aria-expanded="false" aria-controls="nx-nav">☰ Menu</button>
+        <nav class="nx-nav" id="nx-nav">${navHtml}</nav>
+      </header>`,
+      foot: `<footer class="nx-foot">
+        <span class="nx-px">PRESS START</span>
+        <nav class="nx-foot-links">${footLinks.map((l) => `<a href="${esc(l.href)}">${esc(l.text)}</a>`).join('')}</nav>
+        <span>NHL94Online.com · Classic '94</span>
+      </footer>`,
+    };
+  }
+
+  // League card: season + level pickers and every team with its coach.
+  function v1LeagueCard(highlightTeam) {
+    if (!divisions.length && !leagueOpts.length) return '';
+    return `
+      <div class="nx-card"><div class="nx-card-h"><h2>League</h2>${levelName ? `<span class="nx-meta">${esc(levelName)}</span>` : ''}</div>
+        ${leagueOpts.length ? `<div class="nx-level">Season <select class="nx-lg-sel">${leagueOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
+        ${levelOpts.length ? `<div class="nx-level">Level <select class="nx-level-sel">${levelOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
+        ${divisions.map((d) => `<div class="nx-dir"><div class="nx-dir-h">${esc(d.name.toUpperCase())}</div>
+          ${d.teams.map((t) => `<a class="${t === highlightTeam ? 'me' : ''}" href="${esc(teamInfo[t].href)}">${logoImg(t)}<span class="n">${esc(t)}</span><span class="c">${esc(teamInfo[t].coach)}</span></a>`).join('')}
+        </div>`).join('')}
+        <div style="height:8px"></div>
+      </div>`;
+  }
+
+  // Wire the season / level pickers (same URLs the original selects used).
+  function v1WirePickers(app) {
+    $$('.nx-lg-sel', app).forEach((el) => el.addEventListener('change', () => { location.href = '?lg=' + encodeURIComponent(el.value); }));
+    $$('.nx-level-sel', app).forEach((el) => el.addEventListener('change', () => {
+      location.href = '?lg=' + encodeURIComponent(params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '') + '&sublg=' + encodeURIComponent(el.value);
+    }));
+  }
+
+  // ============================================================
+  // My Leagues: the user's own coach pages, one per league/level.
+  // Saved with Tampermonkey storage (GM_*) so nhl94online.com and
+  // www.nhl94online.com share it; falls back to localStorage.
+  // ============================================================
+  const gmStore = {
+    get(k, d) {
+      try { if (typeof GM_getValue === 'function') { const v = GM_getValue(k); return v === undefined ? d : v; } } catch (e) {}
+      return store.get('gm:' + k, d);
+    },
+    set(k, v) {
+      try { if (typeof GM_setValue === 'function') { GM_setValue(k, v); return; } } catch (e) {}
+      store.set('gm:' + k, v);
+    },
+  };
+  const coachPath = (lg, sublg, teamId) =>
+    `/html/coachpage.php?lg=${encodeURIComponent(lg)}&sublg=${encodeURIComponent(sublg)}&team_ID=${encodeURIComponent(teamId)}`;
+  function parseCoachUrl(url) {
+    try {
+      const u = new URL(String(url || '').trim(), 'https://www.nhl94online.com');
+      if (!/(^|\.)nhl94online\.com$/i.test(u.hostname) || !/\/html\/coachpage\.php$/i.test(u.pathname)) return null;
+      const lg = u.searchParams.get('lg'), sublg = u.searchParams.get('sublg') || '', teamId = u.searchParams.get('team_ID');
+      if (!/^\d+$/.test(lg || '') || !/^\d+$/.test(teamId || '')) return null;
+      return { id: lg + ':' + teamId, lg, sublg, teamId, path: coachPath(lg, sublg, teamId) };
+    } catch (e) { return null; }
+  }
+  const str = (v, max = 80) => String(v == null ? '' : v).slice(0, max);
+  function cleanLeague(x) {
+    const p = x && parseCoachUrl(x.path || x.href);
+    return p ? { ...p, team: str(x.team), coach: str(x.coach), league: str(x.league), label: str(x.label), addedAt: +x.addedAt || Date.now() } : null;
+  }
+  const myLeagues = {
+    all() {
+      let list = gmStore.get('myLeagues', null);
+      if (!Array.isArray(list)) {
+        list = [];
+        const old = store.get('myteam', null); // migrate the earlier single "my team" pin
+        const rec = old && cleanLeague({ ...old, league: old.league, path: old.href });
+        if (rec) list.push(rec);
+        gmStore.set('myLeagues', list);
+      }
+      return list.map(cleanLeague).filter(Boolean);
+    },
+    save(list) { gmStore.set('myLeagues', list.map(cleanLeague).filter(Boolean)); document.dispatchEvent(new CustomEvent('nx:myleagues')); },
+    has(id) { return this.all().some((x) => x.id === id); },
+    toggle(rec) {
+      const l = this.all(), i = l.findIndex((x) => x.id === rec.id);
+      if (i >= 0) l.splice(i, 1); else l.push(rec);
+      this.save(l);
+    },
+  };
+  const defName = (x) => (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
+  const mlTitle = (x) => x.label || (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
+  const mlSub = (x) => [x.coach, x.sublg, x.league].filter(Boolean).join(' · ');
+  const currentLg = () => params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '';
+
+  // Read team / coach / season from any coach page (used when adding by link).
+  async function fetchCoachInfo(p) {
+    const res = await fetch(location.origin + p.path, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const doc = new DOMParser().parseFromString(new TextDecoder('windows-1252').decode(await res.arrayBuffer()), 'text/html');
+    const hw = doc.querySelector('.heading_white');
+    if (!hw) throw new Error('not a coach page');
+    const link = [...doc.querySelectorAll('a[href*="coachpage.php"]')].find((a) => new RegExp('team_ID=' + p.teamId + '(\\D|$)').test(a.getAttribute('href') || ''));
+    const opt = doc.querySelector('select[name="lg"] option[selected]');
+    return {
+      team: link ? norm(link.textContent) : '',
+      coach: norm((hw.innerHTML.split(/<br\s*\/?>/i)[0] || '').replace(/<[^>]+>/g, '').replace(/^Coach:\s*/i, '')),
+      league: opt ? norm(opt.textContent) : '',
+    };
+  }
+
+  // Backup file: My Leagues plus every saved setting (nx:* keys) for this browser.
+  function buildBackup() {
+    const prefs = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('nx:') && !k.startsWith('nx:gm:') && k !== 'nx:myteam') prefs[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    return { app: 'nhl94-its-in-the-script', type: 'backup', version: 1, exportedAt: new Date().toISOString(), myLeagues: myLeagues.all(), prefs };
+  }
+  function readBackup(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { throw new Error("That isn't a valid backup file (not JSON)."); }
+    if (!data || data.app !== 'nhl94-its-in-the-script' || !Array.isArray(data.myLeagues)) throw new Error("That file isn't an NHL94 – It's In The Script backup.");
+    const leagues = data.myLeagues.map(cleanLeague).filter(Boolean);
+    const prefs = {};
+    Object.entries(data.prefs || {}).forEach(([k, v]) => { if (/^nx:[\w:.-]+$/.test(k) && !k.startsWith('nx:gm:') && typeof v === 'string' && v.length < 5000) prefs[k] = v; });
+    return { leagues, prefs, exportedAt: data.exportedAt || '' };
+  }
+  function clearPrefs() {
+    try { Object.keys(localStorage).filter((k) => k.startsWith('nx:') && !k.startsWith('nx:gm:')).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  }
+
+  let mlCssDone = false;
+  function mlSetup() {
+    if (mlCssDone) return;
+    mlCssDone = true;
+    addCss(`
+    .nx-star { font-family: var(--nx-ui); }
+    .nx-ml { position: relative; flex: none; order: 3; }
+    .nx-top .nx-nav { order: 2; }
+    .nx-top .nx-menu-btn { order: 4; }
+    .nx-ml-btn .nx-star { color: var(--nx-gold); }
+    .nx-ml-count { font: 400 8px var(--nx-px); background: var(--nx-red); color: var(--nx-on-red); padding: 3px 5px; border-radius: 3px; }
+    .nx-ml-count:empty { display: none; }
+    .nx-ml-menu { position: absolute; right: 0; top: calc(100% + 10px); width: 340px; max-width: calc(100vw - 24px); z-index: 60; padding: 6px;
+      background: var(--nx-card); color: var(--nx-text); border: 1px solid var(--nx-line2); border-top: 3px solid var(--nx-red); border-radius: 0 0 10px 10px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+    .nx-ml-menu[hidden] { display: none; }
+    .nx-ml-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; }
+    .nx-ml-item:hover { background: var(--nx-card2); }
+    .nx-ml-item.cur { box-shadow: inset 3px 0 0 var(--nx-red); }
+    .nx-ml-item .nx-logo { width: 26px; height: 26px; image-rendering: pixelated; flex: none; }
+    .nx-ml-item b { display: block; font: 600 15px var(--nx-cond); text-transform: uppercase; letter-spacing: .5px; color: var(--nx-text); line-height: 1.2; }
+    .nx-ml-item small { display: block; font-size: 12px; color: var(--nx-mute); }
+    .nx-ml-empty { padding: 12px 10px; font-size: 13px; color: var(--nx-mute); }
+    .nx-ml-manage { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; text-align: left; font: 600 13px var(--nx-ui); color: var(--nx-acc);
+      background: none; border: 0; border-top: 1px solid var(--nx-line); cursor: pointer; }
+    .nx-ml-manage:hover { background: var(--nx-card2); }
+    @media (max-width: 760px) { .nx-ml-btn .lbl { display: none; } }
+
+    .nx-btn.nx-ml-add[aria-pressed="true"] { border-color: var(--nx-gold); color: var(--nx-gold) !important; }
+
+    .nx-modal { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; padding: 16px; background: rgba(5,8,14,.66); backdrop-filter: blur(3px); }
+    .nx-modal[hidden] { display: none; }
+    .nx-modal-box { width: min(640px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden;
+      background: var(--nx-card); color: var(--nx-text); border: 1px solid var(--nx-line2); border-top: 4px solid var(--nx-red); border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+    .nx-modal-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--nx-line); }
+    .nx-modal-h h2 { margin: 0; font: 600 20px var(--nx-cond); letter-spacing: 1.5px; text-transform: uppercase; }
+    .nx-x { font-size: 18px; line-height: 1; color: var(--nx-mute); background: none; border: 0; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+    .nx-x:hover { color: var(--nx-text); background: var(--nx-card2); }
+    .nx-modal-b { padding: 14px 18px; overflow-y: auto; font-size: 14px; }
+    .nx-modal-f { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--nx-line); background: var(--nx-bg2); }
+    .nx-mm-dirty { margin-right: auto; font-size: 13px; color: var(--nx-mute); }
+    .nx-mm-dirty.warn { color: var(--nx-red); font-weight: 600; }
+    .nx-mm-help { margin: 0 0 12px; color: var(--nx-mute); font-size: 13px; }
+    .nx-mm-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--nx-line); }
+    .nx-mm-row .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-mm-row .info { flex: 1; min-width: 0; }
+    .nx-mm-row input { width: 100%; font: 600 14px var(--nx-ui); color: var(--nx-text); background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; }
+    .nx-mm-row input:hover { border-color: var(--nx-line2); }
+    .nx-mm-row input:focus { border-color: var(--nx-gold); background: var(--nx-bg2); outline: none; }
+    .nx-mm-row small { display: block; padding: 0 7px; font-size: 12px; color: var(--nx-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-mm-row .acts { display: flex; gap: 4px; flex: none; }
+    .nx-ib { width: 32px; height: 32px; display: grid; place-items: center; font-size: 14px; color: var(--nx-mute); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 6px; cursor: pointer; }
+    .nx-ib:hover:not(:disabled) { color: var(--nx-text); border-color: var(--nx-gold); }
+    .nx-ib:disabled { opacity: .35; cursor: default; }
+    .nx-ib.del:hover { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-mm-empty { padding: 14px 0; color: var(--nx-mute); }
+    .nx-mm-add { display: flex; gap: 8px; margin-top: 12px; }
+    .nx-mm-add input, .nx-mm-sec textarea { flex: 1; min-width: 0; font: 13px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 6px; padding: 8px 10px; }
+    .nx-mm-sec textarea { width: 100%; margin: 8px 0; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .nx-mm-add input:focus, .nx-mm-sec textarea:focus { outline: 2px solid var(--nx-gold); outline-offset: 0; }
+    .nx-mm-msg { min-height: 20px; margin-top: 8px; font-size: 13px; }
+    .nx-mm-msg.ok { color: var(--nx-win); } .nx-mm-msg.err { color: var(--nx-loss); }
+    .nx-v1[data-nx-theme="day"] .nx-mm-msg.ok { color: #0a7a35; } .nx-v1[data-nx-theme="day"] .nx-mm-msg.err { color: #b00020; }
+    .nx-mm-sec { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--nx-line2); }
+    .nx-mm-sec h3 { margin: 0 0 4px; font: 600 14px var(--nx-cond); letter-spacing: 1.2px; text-transform: uppercase; }
+    .nx-mm-sec p { margin: 0 0 10px; font-size: 12px; color: var(--nx-mute); }
+    .nx-mm-sec .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nx-mm-sec summary { cursor: pointer; margin-top: 10px; font-size: 13px; color: var(--nx-gold); }
+    .nx-mm-box { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--nx-line2); border-left: 4px solid var(--nx-gold); border-radius: 6px; background: var(--nx-bg2); font-size: 13px; }
+    .nx-mm-box.danger { border-left-color: var(--nx-red); }
+    .nx-mm-box[hidden] { display: none; }
+    .nx-mm-box .row { margin-top: 8px; }
+    .nx-mbtn { font: 600 13px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2); border: 1px solid var(--nx-line2); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+    .nx-mbtn:hover:not(:disabled) { border-color: var(--nx-gold); }
+    .nx-mbtn.primary { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-mbtn.primary:hover:not(:disabled) { filter: brightness(1.12); }
+    .nx-mbtn.primary:disabled { opacity: .45; cursor: default; }
+    .nx-mbtn.danger { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    `);
+  }
+
+  function mlMenuHtml() {
+    const l = myLeagues.all();
+    const cur = PAGE === 'coach' ? (parseCoachUrl(HREF) || {}).id : '';
+    return (l.length
+      ? l.map((x) => `<a class="nx-ml-item${x.id === cur ? ' cur' : ''}" href="${esc(x.path)}">${logoImg(x.team)}<span><b>${esc(mlTitle(x))}</b><small>${esc(mlSub(x))}</small></span></a>`).join('')
+      : '<div class="nx-ml-empty">No leagues yet. Open one of your coach pages and press <b>+ Add to My Leagues</b>.</div>')
+      + '<button type="button" class="nx-ml-manage">⚙ Manage, back up &amp; restore…</button>';
+  }
+
+  // Top-bar menu + manager dialog, wired once per V1 root.
+  function mlWire(app) {
+    mlSetup();
+    const btn = $('.nx-ml-btn', app), menu = $('.nx-ml-menu', app), count = $('.nx-ml-count', app);
+    const paint = () => { menu.innerHTML = mlMenuHtml(); const n = myLeagues.all().length; count.textContent = n ? String(n) : ''; };
+    const setOpen = (open) => { menu.hidden = !open; btn.setAttribute('aria-expanded', String(open)); if (open) paint(); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(menu.hidden); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.nx-ml')) setOpen(false); });
+    menu.addEventListener('click', (e) => { if (e.target.closest('.nx-ml-manage')) { setOpen(false); openManager(app); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+    document.addEventListener('nx:myleagues', paint);
+    paint();
+    app.addEventListener('click', (e) => { if (e.target.closest('[data-ml-manage]')) { e.preventDefault(); openManager(app); } });
+  }
+
+  function openManager(app) {
+    let modal = $('.nx-modal', app);
+    if (!modal) modal = buildManager(app);
+    modal.nxOpen();
+  }
+
+  function buildManager(app) {
+    const modal = document.createElement('div');
+    modal.className = 'nx-modal';
+    modal.hidden = true;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'nx-mm-title');
+    modal.innerHTML = `
+      <div class="nx-modal-box">
+        <div class="nx-modal-h"><h2 id="nx-mm-title">★ My Leagues</h2><button type="button" class="nx-x" data-act="close" aria-label="Close">✕</button></div>
+        <div class="nx-modal-b">
+          <p class="nx-mm-help">Your own coach pages, one per league. They're saved only in this browser, with no account. Rename, reorder or remove them, then press <b>Save</b>.</p>
+          <div class="nx-mm-list"></div>
+          <form class="nx-mm-add"><input type="text" inputmode="url" placeholder="Paste a coach page link to add it…" aria-label="Coach page link"><button type="submit" class="nx-mbtn">Add</button></form>
+          <div class="nx-mm-msg" role="status" aria-live="polite"></div>
+
+          <div class="nx-mm-sec">
+            <h3>Backup &amp; restore</h3>
+            <p>Download a backup file of your leagues and settings (view, filters). Restore it on another browser or computer.</p>
+            <div class="row">
+              <button type="button" class="nx-mbtn" data-act="export">⬇ Download backup</button>
+              <button type="button" class="nx-mbtn" data-act="import">⬆ Restore from file…</button>
+              <input type="file" accept=".json,application/json" hidden>
+            </div>
+            <details><summary>…or paste backup text</summary>
+              <textarea rows="4" placeholder='{"app":"nhl94-its-in-the-script", …}' aria-label="Backup text"></textarea>
+              <button type="button" class="nx-mbtn" data-act="paste">Check pasted backup</button>
+            </details>
+            <div class="nx-mm-box" data-box="restore" hidden></div>
+          </div>
+
+          <div class="nx-mm-sec">
+            <h3>Clear history</h3>
+            <p>Remove your saved leagues, or wipe everything this script has saved in this browser.</p>
+            <div class="row">
+              <button type="button" class="nx-mbtn" data-act="clear">Clear My Leagues</button>
+              <button type="button" class="nx-mbtn" data-act="reset">Reset everything</button>
+            </div>
+            <div class="nx-mm-box danger" data-box="confirm" hidden></div>
+          </div>
+        </div>
+        <div class="nx-modal-f"><span class="nx-mm-dirty"></span>
+          <button type="button" class="nx-mbtn" data-act="close">Close</button>
+          <button type="button" class="nx-mbtn primary" data-act="save" disabled>Save</button>
+        </div>
+      </div>`;
+    app.appendChild(modal);
+
+    const list = $('.nx-mm-list', modal), msgEl = $('.nx-mm-msg', modal), dirtyEl = $('.nx-mm-dirty', modal);
+    const saveBtn = $('[data-act="save"]', modal), fileIn = $('input[type="file"]', modal), restoreBox = $('[data-box="restore"]', modal);
+    const confirmBox = $('[data-box="confirm"]', modal), addForm = $('.nx-mm-add', modal), addIn = $('input', addForm);
+    let draft = [], dirty = false, closeWarned = false, pending = null, lastFocus = null;
+
+    const msg = (text, kind = '') => { msgEl.textContent = text; msgEl.className = 'nx-mm-msg ' + kind; };
+    const setDirty = (d) => {
+      dirty = d; closeWarned = false; saveBtn.disabled = !d;
+      dirtyEl.className = 'nx-mm-dirty'; dirtyEl.textContent = d ? 'Unsaved changes' : '';
+    };
+    const renderList = () => {
+      list.innerHTML = draft.length ? draft.map((x, i) => `
+        <div class="nx-mm-row" data-i="${i}">
+          ${logoImg(x.team)}
+          <div class="info"><input value="${esc(x.label || defName(x))}" placeholder="${esc(defName(x))}" aria-label="Name for this league" data-f="label" title="Click to rename">
+            <small>${esc(mlSub(x) || x.path)}</small></div>
+          <div class="acts">
+            <button type="button" class="nx-ib" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="Move up" title="Move up">↑</button>
+            <button type="button" class="nx-ib" data-act="down" ${i === draft.length - 1 ? 'disabled' : ''} aria-label="Move down" title="Move down">↓</button>
+            <button type="button" class="nx-ib del" data-act="del" aria-label="Remove" title="Remove">✕</button>
+          </div>
+        </div>`).join('') : '<div class="nx-mm-empty">No leagues yet. Add one with <b>+ Add to My Leagues</b> on a coach page, or paste a coach page link below.</div>';
+    };
+    const showConfirm = (html) => { confirmBox.innerHTML = html; confirmBox.hidden = !html; };
+    const showRestore = (html) => { restoreBox.innerHTML = html; restoreBox.hidden = !html; };
+
+    modal.nxOpen = () => {
+      draft = myLeagues.all(); setDirty(false); msg(''); showConfirm(''); showRestore(''); pending = null;
+      renderList();
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      (addIn).focus();
+    };
+    const close = (force) => {
+      if (dirty && !force && !closeWarned) {
+        closeWarned = true;
+        dirtyEl.className = 'nx-mm-dirty warn';
+        dirtyEl.textContent = 'You have unsaved changes. Press Save, or Close again to discard them.';
+        return;
+      }
+      modal.hidden = true;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    };
+
+    list.addEventListener('input', (e) => {
+      const row = e.target.closest('.nx-mm-row');
+      if (row && e.target.dataset.f === 'label') {
+        const x = draft[+row.dataset.i], v = e.target.value.trim().slice(0, 80);
+        x.label = v === defName(x) ? '' : v; // empty label = use the team name
+        setDirty(true);
+      }
+    });
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const p = parseCoachUrl(addIn.value);
+      if (!p) return msg('That doesn\'t look like a coach page link. It should contain "coachpage.php?lg=…&team_ID=…".', 'err');
+      if (draft.some((x) => x.id === p.id)) return msg('That team is already in your list.', 'err');
+      msg('Looking up that coach page…');
+      let info = {};
+      try { info = await fetchCoachInfo(p); } catch (err) { info = {}; }
+      draft.push(cleanLeague({ ...p, ...info, label: '', addedAt: Date.now() }));
+      addIn.value = '';
+      renderList(); setDirty(true);
+      msg(info.team ? `Added ${fullTeamName(info.team)}${info.coach ? ' (' + info.coach + ')' : ''}. Press Save to keep it.`
+        : "Added, but I couldn't read the team name from that page. You can name it yourself. Press Save to keep it.", info.team ? 'ok' : 'err');
+    });
+
+    fileIn.addEventListener('change', async () => {
+      const f = fileIn.files && fileIn.files[0];
+      fileIn.value = '';
+      if (f) previewRestore(await f.text());
+    });
+
+    function previewRestore(text) {
+      showConfirm('');
+      try {
+        pending = readBackup(text);
+        const names = pending.leagues.map((x) => esc(mlTitle(x))).join(', ') || 'no leagues';
+        const when = pending.exportedAt ? new Date(pending.exportedAt).toLocaleString() : 'unknown date';
+        showRestore(`<b>Backup from ${esc(when)}</b><br>${pending.leagues.length} league${pending.leagues.length === 1 ? '' : 's'}: ${names}<br>
+          ${Object.keys(pending.prefs).length} saved settings. Restoring <b>replaces</b> your current ${myLeagues.all().length} league(s) and settings.
+          <div class="row"><button type="button" class="nx-mbtn primary" data-act="restore-yes">Restore</button><button type="button" class="nx-mbtn" data-act="restore-no">Cancel</button></div>`);
+      } catch (err) { pending = null; showRestore(''); msg(err.message, 'err'); }
+    }
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) return close(false);
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      const act = b.dataset.act;
+      const row = b.closest('.nx-mm-row');
+      const i = row ? +row.dataset.i : -1;
+      if (act === 'close') close(false);
+      else if (act === 'up' && i > 0) { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderList(); setDirty(true); }
+      else if (act === 'down' && i < draft.length - 1) { [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; renderList(); setDirty(true); }
+      else if (act === 'del') { const gone = draft.splice(i, 1)[0]; renderList(); setDirty(true); msg(`Removed ${mlTitle(gone)}. Press Save to confirm.`); }
+      else if (act === 'save') { myLeagues.save(draft); draft = myLeagues.all(); renderList(); setDirty(false); msg('Saved ✓', 'ok'); }
+      else if (act === 'export') {
+        if (dirty) return msg('Save your changes first, then download the backup.', 'err');
+        const blob = new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `nhl94-my-leagues-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        msg('Backup downloaded ✓ Keep that file somewhere safe.', 'ok');
+      }
+      else if (act === 'import') fileIn.click();
+      else if (act === 'paste') previewRestore($('textarea', modal).value);
+      else if (act === 'restore-no') { pending = null; showRestore(''); }
+      else if (act === 'restore-yes' && pending) {
+        myLeagues.save(pending.leagues);
+        clearPrefs();
+        Object.entries(pending.prefs).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch (err) {} });
+        pending = null; showRestore('');
+        draft = myLeagues.all(); renderList(); setDirty(false);
+        msg('Restored ✓ Reload the page to apply restored filters and view.', 'ok');
+      }
+      else if (act === 'clear') {
+        showRestore('');
+        showConfirm(`Remove all ${myLeagues.all().length} saved league(s) from this browser? This can't be undone unless you have a backup.
+          <div class="row"><button type="button" class="nx-mbtn danger" data-act="clear-yes">Yes, clear My Leagues</button><button type="button" class="nx-mbtn" data-act="confirm-no">Cancel</button></div>`);
+      }
+      else if (act === 'reset') {
+        showRestore('');
+        showConfirm(`Remove My Leagues <b>and</b> every setting this script saved (view choice, filters, collapsed groups)? The page will reload.
+          <div class="row"><button type="button" class="nx-mbtn danger" data-act="reset-yes">Yes, reset everything</button><button type="button" class="nx-mbtn" data-act="confirm-no">Cancel</button></div>`);
+      }
+      else if (act === 'confirm-no') showConfirm('');
+      else if (act === 'clear-yes') { myLeagues.save([]); draft = []; renderList(); setDirty(false); showConfirm(''); msg('My Leagues cleared.', 'ok'); }
+      else if (act === 'reset-yes') { myLeagues.save([]); clearPrefs(); location.reload(); }
+    });
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close(false); }
+      if (e.key === 'Tab') { // keep focus inside the dialog
+        const f = $$('button:not(:disabled), input:not([type="file"]), textarea, summary, [href]', modal).filter((x) => x.offsetParent !== null);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
+    });
+    return modal;
+  }
+
+  function v1Mount(innerHtml) {
+    const app = document.createElement('div');
+    app.className = 'nx-root nx-v1';
+    app.setAttribute('data-nx-theme', getMode());
+    const chrome = v1Chrome();
+    app.innerHTML = chrome.head + `<main class="nx-main">${innerHtml}${chrome.foot}</main>`;
+    document.body.appendChild(app);
+    v1WirePickers(app);
+    mlWire(app);
+    // Collapsed menu (narrow windows): toggle, close on outside click or Escape.
+    const menuBtn = $('.nx-menu-btn', app), menu = $('.nx-nav', app);
+    const setMenu = (open) => { menu.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
+    menuBtn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(!menu.classList.contains('open')); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.nx-nav, .nx-menu-btn')) setMenu(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+    return app;
+  }
+
+  // ---------- V1 · Coach page ----------
+  function renderCoachV1() {
+    v1Setup();
+    const gfN = parseInt(stats.gf, 10) || 0, gaN = parseInt(stats.ga, 10) || 0, diff = gfN - gaN;
+
+    const streakShort = stats.streak.replace(/^Won\s*/i, 'W').replace(/^Lost\s*/i, 'L').replace(/^Tied?\s*/i, 'T');
+    const statCells = [
+      ['Record', stats.record], ['Home', stats.home], ['Away', stats.away], ['Streak', streakShort],
+      ['GF', stats.gf], ['GA', stats.ga], ['Diff', (diff > 0 ? '+' : '') + diff, diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''], ['GF/G', stats.gfg], ['GA/G', stats.gag],
+    ].map(([k, v, cls]) => `<div class="nx-stat"><div class="k">${k}</div><div class="v ${cls || ''}">${esc(v || '–')}</div></div>`).join('');
+
+    const cpHtml = checkpoint ? (() => {
+      const need = checkpoint.left + playedCount;
+      const pct = need ? Math.min(100, Math.round((playedCount / need) * 100)) : 100;
+      const urgent = checkpoint.left > 0 && checkpoint.days != null && checkpoint.days <= 3;
+      const dueTxt = checkpoint.left === 0 ? 'Complete' : checkpoint.days == null ? checkpoint.dateText
+        : checkpoint.days < 0 ? 'Past due' : checkpoint.days === 0 ? 'Due today' : `${checkpoint.days} day${checkpoint.days === 1 ? '' : 's'} left`;
+      return `<div class="nx-cp${urgent ? ' urgent' : ''}${checkpoint.left === 0 ? ' done' : ''}">
+        <div class="nx-cp-num">${checkpoint.left}</div>
+        <div class="nx-cp-txt"><b>Games left</b> for Checkpoint ${esc(checkpoint.num)}<br>Due ${esc(checkpoint.dateText)}</div>
+        <div class="nx-cp-bar" title="${playedCount} of ${need} played"><i style="width:${pct}%"></i></div>
+        <div class="nx-cp-due">${esc(dueTxt)}</div>
+      </div>`;
+    })() : '';
+
+    const pillsHtml = groups.map((g) => {
+      const info = teamInfo[g.opp];
+      return `<button type="button" class="nx-pill" data-opp="${esc(g.opp)}">${logoImg(g.opp)}${esc(info ? info.coach : g.opp)}<small>${esc(g.opp)}</small></button>`;
+    }).join('');
+
+    const schedRows = groups.map((g) => {
+      const info = teamInfo[g.opp] || {};
+      const pips = g.games.map((x) => `<i class="${x.result}" title="Gm ${esc(x.gm)} · ${x.isHome ? 'Home' : 'Away'}${x.played ? ' · ' + x.result + ' ' + esc(x.score) : ''}"></i>`).join('');
+      const fullName = esc(fullTeamName(g.opp));
+      const head = `<tr class="nx-grp" data-opp="${esc(g.opp)}"><td colspan="6"><div class="nx-grp-in" title="Click to collapse / expand">
+          <span class="nx-chev">▼</span>${logoImg(g.opp)}
+          <div><div class="nx-grp-name">${info.href ? `<a href="${esc(info.href)}">${fullName}</a>` : fullName}</div>
+            <div><span class="nx-grp-coach">${esc(info.coach || '')}</span>${info.division ? ` <span class="nx-grp-div">· ${esc(info.division)}</span>` : ''}</div></div>
+          <div class="nx-grp-right"><span class="nx-pips">${pips}</span><span class="nx-grp-rec">${g.w}-${g.l}-${g.t}</span>
+            <span class="nx-grp-left${g.left ? '' : ' done'}">${g.left ? g.left + ' to play' : 'Done ✓'}</span></div>
+        </div></td></tr>`;
+      const rows = g.games.map((x) => {
+        const action = x.href
+          ? `<a class="nx-go ${x.played ? 'box' : 'log'}" href="${esc(x.href)}"${x.played ? ' target="_blank"' : ''}><span>${x.played ? 'Box Score' : 'Log Game'}</span></a>` : '';
+        return `<tr class="g-row ${x.isHome ? 'home' : 'away'}" data-opp="${esc(g.opp)}" data-played="${x.played ? 1 : 0}">
+          <td class="gm">${esc(x.gm)}</td>
+          <td class="act">${action}</td>
+          <td class="ha"><span class="nx-ha ${x.isHome ? 'h' : 'a'}">${x.isHome ? 'Home' : 'Away'}</span></td>
+          <td class="sc">${x.played ? esc(x.score) : ''}</td>
+          <td class="rs">${x.result ? `<span class="nx-res ${x.result}">${x.result}</span>` : ''}</td>
+          <td class="tm">${x.time && x.time !== '-' ? esc(x.time) : ''}</td>
+        </tr>`;
+      }).join('');
+      return head + rows;
+    }).join('');
+
+    const standingsHtml = standings ? `
+      <div class="nx-card">
+        <div class="nx-card-h"><h2>${esc(standings.division)}</h2>${standingsLink ? `<a class="nx-link" href="${esc(standingsLink.href)}">Full standings →</a>` : ''}</div>
+        <table class="nx-st"><thead><tr><th></th><th>Team</th><th>W</th><th>L</th><th>T</th><th>DNP</th><th>Pts</th></tr></thead><tbody>
+        ${standings.rows.map((r, i) => {
+          const info = teamInfo[r.team] || {};
+          return `<tr class="${r.team === myTeam ? 'me' : ''}"><td class="pos">${i + 1}</td>
+            <td class="tm"><a class="nx-tmcell" href="${esc(info.href || '#')}">${logoImg(r.team)}<span><div class="n">${esc(r.team)}</div><div class="c">${esc(info.coach || '')}</div></span></a></td>
+            <td>${esc(r.w)}</td><td>${esc(r.l)}</td><td>${esc(r.t)}</td><td>${esc(r.dnp)}</td><td class="pts">${esc(r.pts)}</td></tr>`;
+        }).join('')}
+        </tbody></table>
+      </div>` : '';
+
+    const profileHtml = profile.length ? `
+      <div class="nx-card"><div class="nx-card-h"><h2>Coach Profile</h2></div>
+        <div class="nx-prof">${profile.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>` : '';
+
+    const app = v1Mount(`
+        <section class="nx-hero">
+          <div class="nx-hero-in">
+            <div class="nx-hero-logo">${bigLogo ? `<img src="${esc(bigLogo.src)}" alt="">` : ''}</div>
+            <div class="nx-hero-txt">
+              <div class="nx-eyebrow">${esc(levelName)} <span style="opacity:.5">|</span> ${esc(leagueName.toUpperCase())}</div>
+              <div class="nx-team">${esc(teamFullName || myTeam)}</div>
+              <div class="nx-coach">Head Coach <b>${esc(coachName)}</b></div>
+              <div class="nx-actions">
+                ${rosterLink ? `<a class="nx-btn gold" href="${esc(rosterLink.href)}" target="_blank"><span>Roster Stats</span></a>` : ''}
+                ${standingsLink ? `<a class="nx-btn" href="${esc(standingsLink.href)}"><span>Standings</span></a>` : ''}
+                <a class="nx-btn" href="/html/matchup.php"><span>Head to Head</span></a>
+                <button type="button" class="nx-btn nx-ml-add" hidden><span></span></button>
+              </div>
+            </div>
+            ${rank ? `<div class="nx-hero-rank"><div class="big">${ordinal(rank.pos).toUpperCase()}</div><div class="lab">${esc(standings.division)} · ${esc(rank.pts)} pts</div></div>` : ''}
+          </div>
+          <div class="nx-statbar">${statCells}</div>
+        </section>
+
+        <div class="nx-grid">
+          <div>
+            <div class="nx-card">
+              <div class="nx-card-h"><h2>Schedule</h2><span class="nx-meta">${playedCount} / ${games.length} played</span></div>
+              ${cpHtml}
+              ${games.length ? `
+              <div class="nx-ctrl">
+                <div class="nx-ctrl-row">
+                  <div class="nx-seg" id="nx-seg">
+                    <button type="button" data-v="all">All<span class="n">${games.length}</span></button>
+                    <button type="button" data-v="todo">To Play<span class="n">${games.length - playedCount}</span></button>
+                    <button type="button" data-v="done">Final<span class="n">${playedCount}</span></button>
+                  </div>
+                </div>
+                <div class="nx-ctrl-row"><span class="nx-lab">COACH</span>${pillsHtml}<button type="button" class="nx-clear" id="nx-clear" hidden>Clear</button></div>
+              </div>
+              <table class="nx-sched">
+                <thead><tr><th>Gm</th><th></th><th>H/A</th><th style="text-align:right">Score</th><th style="text-align:center">Res</th><th>Played</th></tr></thead>
+                <tbody>${schedRows}</tbody>
+              </table>` : '<div class="nx-empty">No schedule on this page.</div>'}
+            </div>
+          </div>
+          <aside>
+            ${standingsHtml}
+            ${profileHtml}
+            ${v1LeagueCard(myTeam)}
+          </aside>
+        </div>
+
+    `);
+    applyPalette(app, teamPalette(myTeam));
+
+    // ============================================================
+    // 4. Behavior
+    // ============================================================
+    // "+ Add to My Leagues": saves this coach page to the user's league list.
+    const addBtn = $('.nx-ml-add', app);
+    const thisLeague = parseCoachUrl(HREF);
+    if (thisLeague) {
+      const rec = { ...thisLeague, team: myTeam, coach: coachName, league: (leagueOpts.find((o) => o.sel) || {}).t || '', label: '', addedAt: Date.now() };
+      const paintAdd = () => {
+        const on = myLeagues.has(rec.id);
+        addBtn.firstElementChild.textContent = on ? '✓ In My Leagues' : '+ Add to My Leagues';
+        addBtn.setAttribute('aria-pressed', String(on));
+        addBtn.title = on ? 'This team is in your My Leagues list. Click to remove it.' : 'Save this team to My Leagues (top bar) for one-click access';
+      };
+      addBtn.hidden = false;
+      addBtn.addEventListener('click', () => { myLeagues.toggle(rec); });
+      document.addEventListener('nx:myleagues', paintAdd);
+      paintAdd();
+    }
+
+    if (!games.length) return app;
+
+    // Filters + collapsed groups (saved per coach page)
+    const selected = new Set(store.get('opp:' + pageKey, []));
+    const collapsed = new Set(store.get('collapsed:' + pageKey, []));
+    let mode = store.get('mode:' + pageKey, 'all');
+    const tbody = $('table.nx-sched tbody', app);
+    const seg = $('#nx-seg', app);
+    const clearBtn = $('#nx-clear', app);
+
+    function apply() {
+      $$('.nx-pill', app).forEach((b) => b.classList.toggle('on', selected.has(b.dataset.opp)));
+      $$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.v === mode));
+      clearBtn.hidden = !selected.size;
+      $$('tr.nx-grp', tbody).forEach((h) => {
+        const o = h.dataset.opp;
+        const oppOk = !selected.size || selected.has(o);
+        let any = false;
+        $$('tr.g-row', tbody).filter((r) => r.dataset.opp === o).forEach((r) => {
+          const modeOk = mode === 'all' || (mode === 'todo' ? r.dataset.played === '0' : r.dataset.played === '1');
+          if (oppOk && modeOk) any = true;
+          r.style.display = oppOk && modeOk && !collapsed.has(o) ? '' : 'none';
+        });
+        h.style.display = any ? '' : 'none';
+        h.classList.toggle('collapsed', collapsed.has(o));
+      });
+    }
+
+    app.addEventListener('click', (e) => {
+      const pill = e.target.closest('.nx-pill');
+      if (pill) {
+        const o = pill.dataset.opp;
+        if (selected.has(o)) selected.delete(o); else selected.add(o);
+        store.set('opp:' + pageKey, [...selected]);
+        return apply();
+      }
+      if (e.target === clearBtn) { selected.clear(); store.set('opp:' + pageKey, []); return apply(); }
+      const sb = e.target.closest('#nx-seg button');
+      if (sb) { mode = sb.dataset.v; store.set('mode:' + pageKey, mode); return apply(); }
+      const grp = e.target.closest('tr.nx-grp');
+      if (grp && !e.target.closest('a')) {
+        const o = grp.dataset.opp;
+        if (collapsed.has(o)) collapsed.delete(o); else collapsed.add(o);
+        store.set('collapsed:' + pageKey, [...collapsed]);
+        return apply();
+      }
+    });
+
+    apply();
+    return app;
+  }
+
+  // ---------- Home page data ----------
+  function scrapeHome() {
+    const imgP = (alt) => { const i = $$('img').find((x) => new RegExp(alt, 'i').test(x.alt || '')); return i ? i.closest('td') : null; };
+
+    // Welcome copy: the left-aligned paragraphs next to the "Welcome" banner (site's own markup, kept as-is)
+    const welcomeTd = imgP('^Welcome to the Online');
+    const welcome = welcomeTd ? $$('p[align="left"]', welcomeTd).map((p) => p.innerHTML) : [];
+    const discord = $$('a[href*="discord.gg"]')[0];
+
+    // Notes box
+    const notesTd = imgP('^Notes$');
+    const notes = notesTd ? $$('p', notesTd).map((p) => norm(p.textContent)).filter((t) => t.length > 20).join(' ') : '';
+
+    // Latest 10 scores for the selected level
+    const scoreTable = leafTables().find((t) => /^\S+ Away @ Home Timestamp$/.test(firstRowText(t)));
+    const scoresLevel = scoreTable ? norm(scoreTable.rows[0].cells[0].textContent) : '';
+    const scores = scoreTable ? [...scoreTable.rows].slice(1).filter((r) => r.cells.length >= 5).map((r) => {
+      const a = r.cells[0].querySelector('a');
+      const txt = norm(r.cells[0].textContent);
+      const m = txt.match(/^(\d+)\s*-\s*(\d+)\s+([A-Za-z.]+)?\s*(OT)?/i) || [];
+      const away = resolveTeam(r.cells[1].textContent), home = resolveTeam(r.cells[3].textContent);
+      const hi = +m[1] || 0, lo = +m[2] || 0, abbr = m[3] || '';
+      let winner = '';
+      if (abbr && hi !== lo) winner = abbrScore(abbr, home) > abbrScore(abbr, away) ? home : away;
+      return {
+        away, home, winner, ot: !!m[4] || /\bOT\b/.test(txt), href: a ? a.href : '', time: norm(r.cells[4].textContent),
+        awayG: winner === home ? lo : hi, homeG: winner === home ? hi : lo,
+      };
+    }) : [];
+    const levelTabs = $$('a[href*="index.php?lg="]').map((a) => {
+      const u = new URL(a.href, location.href);
+      return { label: norm(a.textContent), href: a.href, sublg: u.searchParams.get('sublg') };
+    }).filter((t, i, arr) => t.sublg && arr.findIndex((x) => x.sublg === t.sublg) === i);
+
+    // Downloads, grouped by their section header rows
+    const dlGroups = [];
+    leafTables().filter((t) => t.querySelector('a[href*="/downloads/"]')).forEach((t) => {
+      let g = null;
+      [...t.rows].forEach((r) => {
+        const link = r.querySelector('a[href*="/downloads/"]');
+        if (!link) { const h = norm(r.textContent); if (h) { g = { name: h, items: [] }; dlGroups.push(g); } return; }
+        if (!g) { g = { name: 'Downloads', items: [] }; dlGroups.push(g); }
+        g.items.push({ label: norm(r.cells[0].textContent), href: link.href });
+      });
+    });
+    const dlNote = norm(($$('.small_red').find((s) => /RetroArch packages/i.test(s.textContent)) || {}).textContent || '');
+    const dlUpdated = norm(($$('.text_red').find((s) => /Updated/i.test(s.textContent)) || {}).textContent || '').replace(/\*/g, '');
+    const gettingStarted = $$('a').find((a) => /getting-started\.php/.test(a.getAttribute('href') || ''));
+
+    return { welcome, discord: discord ? discord.href : '', notes, scores, scoresLevel, levelTabs, dlGroups, dlNote, dlUpdated,
+      gettingStarted: gettingStarted ? gettingStarted.href : '/html/getting-started.php' };
+  }
+
+  // ---------- V1 · Home page ----------
+  function renderHomeV1() {
+    v1Setup();
+    const H = scrapeHome();
+    const lgNow = currentLg();
+    const mineIds = () => new Set(myLeagues.all().map((x) => x.id));
+    const myHereTeam = (myLeagues.all().find((x) => x.lg === lgNow && x.sublg === levelName) || {}).team || '';
+
+    addCss(`
+    .nx-v1 .nx-h-hero .nx-hero-in { align-items: center; }
+    .nx-h-word { margin: 12px 0 6px; font-family: var(--nx-px); font-size: clamp(22px, 4vw, 40px); line-height: 1.15; color: #fff;
+      text-shadow: 4px 4px 0 var(--nx-red), 0 0 24px rgba(255,255,255,.12); letter-spacing: 1px; }
+    .nx-h-word span { color: var(--nx-gold); }
+    .nx-h-sub { font-size: 15px; color: rgba(255,255,255,.86); max-width: 560px; }
+    .nx-h-mine { flex: none; width: 290px; margin-right: 110px; padding: 14px; background: rgba(0,0,0,.34); border: 1px solid rgba(255,255,255,.2); border-radius: 12px; color: #fff; }
+    .nx-h-mine .lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-gold); letter-spacing: .5px; margin-bottom: 10px; }
+    .nx-star { font-family: var(--nx-ui); font-size: 11px; }
+    .nx-h-ml { display: flex; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; color: #fff; }
+    .nx-h-ml:hover { background: rgba(255,255,255,.1); }
+    .nx-h-ml .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-h-ml > span:nth-child(2) { flex: 1; min-width: 0; }
+    .nx-h-ml .t { display: block; font: 600 16px var(--nx-cond); text-transform: uppercase; letter-spacing: .5px; line-height: 1.15; color: #fff; }
+    .nx-h-ml .c { display: block; font-size: 12px; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-ml .go { color: var(--nx-gold); font-weight: 700; }
+    .nx-h-ml-manage { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.85) !important; text-decoration: underline !important; text-underline-offset: 2px; }
+    @media (max-width: 900px) { .nx-h-mine { margin-right: 0; width: 100%; } .nx-v1 .nx-h-hero .nx-hero-in { flex-wrap: wrap; } }
+
+    .nx-h-note { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; padding: 12px 16px; background: var(--nx-card);
+      border: 1px solid var(--nx-line2); border-left: 4px solid var(--nx-red); border-radius: 10px; box-shadow: var(--nx-shadow); }
+    .nx-h-note .tag { font-family: var(--nx-px); font-size: 8px; color: var(--nx-on-gold); background: var(--nx-gold); padding: 6px 8px; border-radius: 3px; }
+    .nx-h-note p { margin: 0; flex: 1; min-width: 240px; font-size: 13px; color: var(--nx-text); }
+    .nx-h-note .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nx-h-note .nx-btn { background: var(--nx-score); border-color: var(--nx-line2); }
+    .nx-h-note .nx-btn:hover { background: var(--nx-red); border-color: var(--nx-red); color: var(--nx-on-red) !important; }
+
+    .nx-h-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-tab { font: 600 12px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; padding: 5px 11px; border-radius: 4px;
+      color: var(--nx-acc); background: var(--nx-bg2); border: 1px solid var(--nx-line2); }
+    .nx-h-tab:hover { color: var(--nx-strong); border-color: var(--nx-acc); }
+    .nx-h-tab.on { color: var(--nx-on-red); background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-h-tab .star { color: var(--nx-gold); margin-left: 4px; }
+    .nx-h-tab:not(.on) .star { color: var(--nx-acc); }
+
+    .nx-h-game { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 9px 16px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-game:nth-child(even) { background: var(--nx-row-away); }
+    .nx-h-game:hover { background: var(--nx-hover); }
+    .nx-h-tm { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--nx-mute); }
+    .nx-h-tm.away { flex-direction: row-reverse; text-align: right; }
+    .nx-h-tm img, .nx-h-tm .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-h-tm .n { font-family: var(--nx-cond); font-size: 16px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; line-height: 1.15;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-tm .c { font-size: 11px; color: var(--nx-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-tm.win { color: var(--nx-strong); }
+    .nx-h-tm.win .n { font-weight: 700; }
+    .nx-h-tm.win .c { color: var(--nx-acc); }
+    .nx-h-tm.mine .n::after { content: " ★"; color: var(--nx-acc); }
+    .nx-h-score { display: flex; align-items: center; gap: 6px; font-family: var(--nx-px); font-size: 15px; color: #8A96A8; padding: 6px 10px;
+      background: var(--nx-score); border: 1px solid var(--nx-line2); border-radius: 4px; min-width: 96px; justify-content: center; }
+    .nx-h-score b { color: #fff; font-weight: 400; }
+    .nx-h-score .ot { font-family: var(--nx-cond); font-size: 10px; letter-spacing: 1px; color: var(--nx-on-gold); background: var(--nx-gold); padding: 1px 4px; border-radius: 2px; margin-left: 2px; }
+    .nx-h-meta { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+    .nx-h-meta .time { font-size: 11px; color: var(--nx-mute); text-align: right; white-space: nowrap; }
+    @media (max-width: 760px) { .nx-h-game { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); } .nx-h-meta { grid-column: 1 / -1; justify-content: center; } }
+
+    .nx-h-copy { padding: 6px 18px 16px; font-size: 14px; line-height: 1.6; color: var(--nx-text); }
+    .nx-h-copy p { margin: 12px 0 0; }
+    .nx-h-copy p a { color: var(--nx-acc) !important; text-decoration: underline !important; text-underline-offset: 2px; }
+    .nx-h-copy .nx-btn { margin-top: 16px; }
+
+    .nx-h-dl-h { padding: 12px 16px 6px; font-family: var(--nx-px); font-size: 8px; color: var(--nx-acc); letter-spacing: .5px; }
+    .nx-h-dl a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-dl a:hover { background: var(--nx-hover); }
+    .nx-h-dl a:hover .get { background: var(--nx-red); color: var(--nx-on-red); border-color: var(--nx-red); }
+    .nx-h-dl .get { flex: none; font: 600 11px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; padding: 3px 9px; border-radius: 3px;
+      color: var(--nx-acc); border: 1px solid color-mix(in srgb, var(--nx-acc) 55%, transparent); }
+    .nx-h-dl-note { padding: 10px 16px 14px; font-size: 12px; color: var(--nx-mute); }
+    `);
+
+    const teamSide = (team, side, isWin) => {
+      const info = teamInfo[team] || {};
+      const isMine = !!info.href && mineIds().has((parseCoachUrl(info.href) || {}).id);
+      return `<a class="nx-h-tm ${side}${isWin ? ' win' : ''}${isMine ? ' mine' : ''}" href="${esc(info.href || '#')}">
+        ${logoImg(team)}<span style="min-width:0"><div class="n">${esc(team)}</div><div class="c">${esc(info.coach || '')}</div></span></a>`;
+    };
+
+    const scoresHtml = H.scores.map((g) => `
+      <div class="nx-h-game">
+        ${teamSide(g.away, 'away', g.winner === g.away)}
+        <div class="nx-h-score">${g.winner === g.away ? `<b>${g.awayG}</b>` : g.awayG}<span>-</span>${g.winner === g.home ? `<b>${g.homeG}</b>` : g.homeG}${g.ot ? '<span class="ot">OT</span>' : ''}</div>
+        ${teamSide(g.home, 'home', g.winner === g.home)}
+        <div class="nx-h-meta"><span class="time">${esc(g.time)}</span>${g.href ? `<a class="nx-go box" href="${esc(g.href)}" target="_blank"><span>Box Score</span></a>` : ''}</div>
+      </div>`).join('');
+
+    const tabsHtml = H.levelTabs.map((t) =>
+      `<a class="nx-h-tab${t.sublg === H.scoresLevel ? ' on' : ''}" href="${esc(t.href)}">${esc(t.label)}${myLeagues.all().some((x) => x.lg === lgNow && x.sublg === t.sublg) ? '<span class="star" title="You have a team here">★</span>' : ''}</a>`).join('');
+
+    const dl = H.dlGroups.map((g) => `<div class="nx-h-dl"><div class="nx-h-dl-h">${esc(g.name.toUpperCase())}</div>
+      ${g.items.map((i) => `<a href="${esc(i.href)}"><span>${esc(i.label)}</span><span class="get">Download</span></a>`).join('')}</div>`).join('');
+    const ra = (H.dlGroups.find((g) => /RetroArch/i.test(g.name)) || { items: [] }).items;
+    const raBtn = (re, label) => { const i = ra.find((x) => re.test(x.label)); return i ? `<a class="nx-btn" href="${esc(i.href)}"><span>${label}</span></a>` : ''; };
+
+    // Hero card: the user's leagues (hidden until they add one).
+    const myLeaguesHtml = () => {
+      const l = myLeagues.all();
+      if (!l.length) return '';
+      return `<div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY LEAGUES</div>
+        ${l.slice(0, 5).map((x) => `<a class="nx-h-ml" href="${esc(x.path)}">${logoImg(x.team)}<span><span class="t">${esc(mlTitle(x))}</span><span class="c">${esc([x.sublg, x.league].filter(Boolean).join(' · '))}</span></span><span class="go">→</span></a>`).join('')}
+        <a class="nx-h-ml-manage" href="#" data-ml-manage>${l.length > 5 ? `+${l.length - 5} more · ` : ''}Manage</a>
+      </div>`;
+    };
+
+    const leagueName0 = (leagueOpts.find((o) => o.sel) || {}).t || '';
+    const app = v1Mount(`
+      <section class="nx-hero nx-h-hero">
+        <div class="nx-hero-in">
+          <div class="nx-hero-txt">
+            <div class="nx-eyebrow">${esc(leagueName0.toUpperCase() || 'CLASSIC \'94')}</div>
+            <div class="nx-h-word">NHL'94 <span>ONLINE</span></div>
+            <div class="nx-h-sub">Play the classic online against coaches from across North America.</div>
+            <div class="nx-actions">
+              <a class="nx-btn gold" href="${esc(H.gettingStarted)}"><span>Getting Started</span></a>
+              <a class="nx-btn" href="/html/about.php"><span>About</span></a>
+              <a class="nx-btn" href="/html/rules.php"><span>Rules</span></a>
+              ${H.discord ? `<a class="nx-btn" href="${esc(H.discord)}" target="_blank"><span>Join Discord</span></a>` : ''}
+            </div>
+          </div>
+          <div class="nx-h-mlwrap">${myLeaguesHtml()}</div>
+        </div>
+      </section>
+
+      ${H.notes ? `<div class="nx-h-note"><span class="tag">NOTE</span><p>${esc(H.notes)}</p>
+        <div class="acts">${raBtn(/Windows/i, 'RetroArch · Windows')}${raBtn(/Mac/i, 'RetroArch · Mac')}</div></div>` : ''}
+
+      <div class="nx-grid">
+        <div>
+          <div class="nx-card">
+            <div class="nx-card-h"><h2>Latest Scores</h2><span class="nx-meta">${esc(H.scoresLevel)} · last ${H.scores.length}</span></div>
+            ${tabsHtml ? `<div class="nx-h-tabs">${tabsHtml}</div>` : ''}
+            ${scoresHtml || '<div class="nx-empty">No games logged yet.</div>'}
+          </div>
+          ${H.welcome.length ? `<div class="nx-card"><div class="nx-card-h"><h2>Welcome</h2></div>
+            <div class="nx-h-copy">${H.welcome.map((p) => `<p>${p}</p>`).join('')}
+              ${H.discord ? `<a class="nx-btn gold" href="${esc(H.discord)}" target="_blank"><span>Join us on Discord</span></a>` : ''}</div></div>` : ''}
+        </div>
+        <aside>
+          ${v1LeagueCard(myHereTeam)}
+          ${dl ? `<div class="nx-card"><div class="nx-card-h"><h2>Downloads</h2>${H.dlUpdated ? `<span class="nx-meta">${esc(H.dlUpdated)}</span>` : ''}</div>
+            ${dl}${H.dlNote ? `<div class="nx-h-dl-note">${esc(H.dlNote)}</div>` : ''}</div>` : ''}
+        </aside>
+      </div>
+    `);
+    applyPalette(app, HOME_PALETTE);
+    document.addEventListener('nx:myleagues', () => { const w = $('.nx-h-mlwrap', app); if (w) w.innerHTML = myLeaguesHtml(); });
+    return app;
+  }
+
+  // ============================================================
+  // Version registry + View switcher
+  // ------------------------------------------------------------
+  // Each version maps page -> renderer. A renderer returns its root element
+  // (class "nx-root"). To redesign another page, add it to PAGE detection at the
+  // top and give it a renderer here. The newest version is the default view.
+  // ============================================================
+  const ALL_VERSIONS = [
+    { id: 'classic', label: 'Classic', title: 'Original nhl94online.com page' },
+    { id: 'v1', label: 'V1', title: 'V1 · Rink Night', pages: { coach: renderCoachV1, home: renderHomeV1 } },
+  ];
+  // Only offer versions that have a design for this page.
+  const VERSIONS = ALL_VERSIONS.filter((v) => !v.pages || v.pages[PAGE]).map((v) => ({ ...v, render: v.pages && v.pages[PAGE] }));
+  const DEFAULT_VIEW = VERSIONS[VERSIONS.length - 1].id;
+
+  addCss(`
+  body[data-nx-view]:not([data-nx-view="classic"]) { margin: 0 !important; background: #0a0c11 !important; }
+  body[data-nx-view]:not([data-nx-view="classic"]) > *:not(.nx-root):not(.nx-switch) { display: none !important; }
+  .nx-root:not(.nx-active) { display: none !important; }
+  .nx-switch { position: fixed; right: 14px; bottom: 14px; z-index: 2147483000; display: flex; align-items: center; gap: 2px; padding: 3px;
+    font: 600 12px Inter, "Segoe UI", system-ui, sans-serif; background: rgba(17,20,27,.94); border: 1px solid #323a4a; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); backdrop-filter: blur(8px); }
+  .nx-switch-lab { padding: 0 8px 0 6px; font: 400 7px "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; }
+  .nx-switch button { font: inherit; color: #9aa3b5; background: none; border: 0; border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+  .nx-switch button:hover { color: #fff; background: rgba(255,255,255,.06); }
+  .nx-switch button[aria-pressed="true"] { color: #111; background: #F1BE48; }
+  .nx-switch button:focus-visible { outline: 2px solid #F1BE48; outline-offset: 1px; }
+  .nx-sw-mode { display: flex; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid #323a4a; }
+  body[data-nx-view="classic"] .nx-sw-mode { display: none; }
+  .nx-sw-ver { margin-left: 4px; padding: 0 6px 0 8px; border-left: 1px solid #323a4a; font: 400 7px/1 "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; white-space: nowrap; }
+  .nx-sw-chan { display: inline-block; margin-left: 5px; padding: 2px 3px; border-radius: 3px; color: #111; background: #F1BE48; }
+  `);
+
+  const rendered = {};
+  const sw = document.createElement('div');
+  sw.className = 'nx-switch';
+  sw.setAttribute('role', 'group');
+  sw.setAttribute('aria-label', 'Page view');
+  sw.title = 'Switch view (Alt+Shift+V)';
+  sw.innerHTML = '<span class="nx-switch-lab">VIEW</span>' + VERSIONS.map((v) =>
+    `<button type="button" data-view="${v.id}" title="${esc(v.title)}">${esc(v.label)}</button>`).join('') +
+    '<span class="nx-sw-mode" role="group" aria-label="Colour mode">' +
+    '<button type="button" data-mode="day" title="Day mode" aria-label="Day mode">☀</button>' +
+    '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>' +
+    `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION} · ${CHANNEL} channel">v${SCRIPT_VERSION}` +
+    (CHANNEL === 'stable' ? '' : `<span class="nx-sw-chan">${CHANNEL.toUpperCase()}</span>`) + '</span>';
+  document.body.appendChild(sw);
+  $$('.nx-sw-mode button', sw).forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.mode === getMode()));
+    b.addEventListener('click', () => setMode(b.dataset.mode));
+  });
+
+  function setView(id) {
+    if (!VERSIONS.some((v) => v.id === id)) id = DEFAULT_VIEW;
+    const v = VERSIONS.find((x) => x.id === id);
+    if (v.render && !rendered[id]) {
+      try { rendered[id] = v.render(); } catch (e) { console.error('[nhl94-its-in-the-script]', e); id = 'classic'; }
+    }
+    Object.entries(rendered).forEach(([k, el]) => el && el.classList.toggle('nx-active', k === id));
+    document.body.setAttribute('data-nx-view', id);
+    let vp = document.querySelector('meta[name="viewport"][data-nx]');
+    if (id !== 'classic' && !vp && !document.querySelector('meta[name="viewport"]')) {
+      vp = document.createElement('meta'); vp.name = 'viewport'; vp.content = 'width=device-width, initial-scale=1'; vp.dataset.nx = '1';
+      document.head.appendChild(vp);
+    } else if (id === 'classic' && vp) vp.remove();
+    $$('button[data-view]', sw).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === id)));
+    store.set('view', id);
+  }
+  sw.addEventListener('click', (e) => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
+  document.addEventListener('keydown', (e) => {
+    if (!(e.altKey && e.shiftKey && e.code === 'KeyV')) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName)) return;
+    e.preventDefault();
+    const i = VERSIONS.findIndex((v) => v.id === document.body.getAttribute('data-nx-view'));
+    setView(VERSIONS[(i + 1) % VERSIONS.length].id);
+  });
+
+  // Users of the pre-switcher build who chose "Classic view" stay on classic.
+  setView(store.get('view', store.get('classic', false) ? 'classic' : DEFAULT_VIEW));
+})();
