@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.2.0
+// @version      1.2.1
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -1024,10 +1024,7 @@
         <div class="row"><img src="${esc(logo(mine.team, 100) || '')}" alt="" onerror="this.style.visibility='hidden'">
           <div><div class="t">${esc(fullTeamName(mine.team))}</div><div class="c">Coach ${esc(mine.coach)} · ${esc(mine.level || '')}</div></div></div>
         <a class="nx-btn gold" href="${esc(mine.href)}"><span>Open my schedule →</span></a>
-      </div>` : `
-      <div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY TEAM</div>
-        <p>Open your coach page and press <b>☆ Set as my team</b>. Your schedule will be one click away from here.</p>
-      </div>`;
+      </div>` : '';
 
     const leagueName0 = (leagueOpts.find((o) => o.sel) || {}).t || '';
     const app = v1Mount(`
