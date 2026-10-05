@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.1.1
+// @version      1.1.2
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -319,7 +319,22 @@
     .nx-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; margin-top: 22px; }
     @media (max-width: 1100px) { .nx-grid { grid-template-columns: minmax(0, 1fr); } .nx-league { display: none; } }
     @media (max-width: 1280px) { .nx-nav > div > a { padding: 0 7px; font-size: 13px; letter-spacing: .3px; } .nx-top { gap: 14px; padding: 0 16px; } }
-    @media (max-width: 760px) { .nx-nav { display: none; } .nx-main { padding: 14px; } }
+    .nx-menu-btn { display: none; margin-left: auto; align-items: center; gap: 8px; font: 600 14px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase;
+      color: #fff; background: var(--nx-card2); border: 1px solid var(--nx-line2); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+    .nx-menu-btn:hover, .nx-menu-btn[aria-expanded="true"] { border-color: var(--nx-gold); color: var(--nx-gold); }
+    @media (max-width: 1180px) {
+      .nx-top { position: sticky; }
+      .nx-menu-btn { display: inline-flex; }
+      .nx-nav { display: none; position: absolute; top: 100%; left: 0; right: 0; height: auto; flex-direction: column; align-items: stretch; justify-content: flex-start;
+        max-height: calc(100vh - 58px); overflow-y: auto; padding: 8px 16px 16px; background: var(--nx-card); border-bottom: 2px solid var(--nx-red);
+        box-shadow: 0 20px 40px rgba(0,0,0,.5); }
+      .nx-nav.open { display: flex; }
+      .nx-nav > div { flex-direction: column; }
+      .nx-nav > div > a { padding: 12px 6px; font-size: 15px; border-bottom: 1px solid var(--nx-line); }
+      .nx-nav > div:hover > a, .nx-nav > div:focus-within > a { border-bottom-color: var(--nx-line); }
+      .nx-nav .nx-sub { display: block; position: static; min-width: 0; padding: 2px 0 6px 12px; background: none; border: 0; box-shadow: none; }
+    }
+    @media (max-width: 760px) { .nx-main { padding: 14px; } }
 
     /* ---------- Hero ---------- */
     .nx-hero { position: relative; overflow: hidden; border-radius: 14px; border: 1px solid var(--nx-line2);
@@ -532,7 +547,8 @@
         <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
       <header class="nx-top">
         <a class="nx-brand" href="/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
-        <nav class="nx-nav">${navHtml}</nav>
+        <button type="button" class="nx-menu-btn" aria-expanded="false" aria-controls="nx-nav">☰ Menu</button>
+        <nav class="nx-nav" id="nx-nav">${navHtml}</nav>
       </header>`,
       foot: `<footer class="nx-foot">
         <span class="nx-px">PRESS START</span>
@@ -571,6 +587,12 @@
     app.innerHTML = chrome.head + `<main class="nx-main">${innerHtml}${chrome.foot}</main>`;
     document.body.appendChild(app);
     v1WirePickers(app);
+    // Collapsed menu (narrow windows): toggle, close on outside click or Escape.
+    const menuBtn = $('.nx-menu-btn', app), menu = $('.nx-nav', app);
+    const setMenu = (open) => { menu.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
+    menuBtn.addEventListener('click', (e) => { e.stopPropagation(); setMenu(!menu.classList.contains('open')); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.nx-nav, .nx-menu-btn')) setMenu(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
     return app;
   }
 

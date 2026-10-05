@@ -20,7 +20,9 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 ## Install (one click)
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser.
+**New to Tampermonkey?** Follow the **[step-by-step install guide](INSTALL.md)** for Chrome, Brave, Firefox and Edge.
+
+1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser. On Chrome, Brave or Edge, also turn on **Allow User Scripts** in the extension's details.
 2. Click **[Install the script](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js)**, then click **Install** on the Tampermonkey screen that opens.
 3. Open [nhl94online.com](https://www.nhl94online.com) or any coach page.
 

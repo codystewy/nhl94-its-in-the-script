@@ -25,6 +25,12 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 - **Coach filter pills** toggle on and off, can be combined, and are **saved across refreshes** (localStorage, per `team_ID`).
 - Every design version can be switched from the **VIEW switcher** (bottom-right), just like Classic on/off. Never remove an old version.
 
+## Screenshots the user provides
+
+- When the user says "screenshot(s)", look in **`screenshots/`** at the repo root first (`ls -t screenshots/` for the newest). It's gitignored and holds the user's raw captures, such as bug reports with arrows or install-guide steps.
+- To publish one (e.g. in `INSTALL.md` or the README), copy a cropped version into `docs/` and reference it there. Never commit `screenshots/` itself.
+- `docs/screenshots/` holds the README showcase images, regenerated with `dev/preview.sh`.
+
 ## Repo map
 
 - `nhl94-its-in-the-script.user.js` is the single shipped file. It runs on the whole domain (`@match *nhl94online.com/*`). Its parts, in order:
