@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.1.2
+// @version      1.2.0
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -911,6 +911,89 @@
     .nx-h-dl-note { padding: 10px 16px 14px; font-size: 12px; color: var(--nx-mute); }
     .nx-foot-links { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; }
     .nx-foot-links a:hover { color: var(--nx-gold); }
+    /* ===== "Classic '94" palette for the home page: the original site's blues, dark red and yellow ===== */
+    .nx-v1.nx-t94 {
+      --nx-red: #9B0000; --nx-red-d: #6E0000; --nx-gold: #3366CC; --nx-gold-d: #24489A;
+      --nx-bg: #E5EEF6; --nx-bg2: #EEF4FA; --nx-card: #FFFFFF; --nx-card2: #F2F7FC; --nx-line: #D3E2EA; --nx-line2: #B4C8DD;
+      --nx-text: #1E1E1E; --nx-mute: #4A5A70; --nx-dim: #7A8799; --nx-blue: #3366CC; --nx-steel: #6699CC; --nx-yellow: #FFCC00;
+      background: url(/images/bg.gif) repeat-x fixed, #6699CC; /* bg.gif fades white -> #6699CC, like the original site */
+    }
+    .nx-t94 .nx-ticker { background: #1E1E1E; }
+    .nx-t94 .nx-ticker-tag { background: var(--nx-yellow); }
+    .nx-t94 .nx-ticker-item { color: #9fb3c8; }
+    .nx-t94 .nx-ticker-item b { color: #fff; }
+    .nx-t94 .nx-ticker-item a:hover b { color: var(--nx-yellow); }
+    .nx-t94 .nx-top { background: rgba(30,30,30,.96); border-bottom: 3px solid var(--nx-steel); }
+    .nx-t94 .nx-brand-a { text-shadow: 3px 3px 0 var(--nx-red); }
+    .nx-t94 .nx-brand-b { color: var(--nx-yellow); }
+    .nx-t94 .nx-nav > div > a { color: #cfd9e4; }
+    .nx-t94 .nx-nav > div:hover > a, .nx-t94 .nx-nav > div:focus-within > a { color: #fff; border-bottom-color: var(--nx-steel); }
+    .nx-t94 .nx-nav .nx-sub { border-top-color: var(--nx-blue); }
+    .nx-t94 .nx-sub a:hover { color: var(--nx-blue); }
+    .nx-t94 .nx-menu-btn { background: #2b2b2b; border-color: #444; color: #fff; }
+    .nx-t94 .nx-menu-btn:hover, .nx-t94 .nx-menu-btn[aria-expanded="true"] { border-color: var(--nx-yellow); color: var(--nx-yellow); }
+    @media (max-width: 1180px) {
+      .nx-t94 .nx-nav { background: #fff; border-bottom-color: var(--nx-blue); }
+      .nx-t94 .nx-nav > div > a { color: var(--nx-text); }
+      .nx-t94 .nx-nav > div:hover > a { color: var(--nx-blue); }
+    }
+
+    .nx-t94 .nx-hero { border-color: #24489A; box-shadow: 0 8px 30px rgba(36,72,154,.25);
+      background: linear-gradient(105deg, #3366CC 0%, #2A57B0 40%, #1C3C82 72%, #10265A 100%); }
+    .nx-t94 .nx-hero::before { background: repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px); }
+    .nx-t94 .nx-hero-in::after { background: linear-gradient(100deg, transparent 0 30%, rgba(255,255,255,.9) 30% 34%, transparent 34% 44%, rgba(155,0,0,.9) 44% 47%, transparent 47%); }
+    .nx-t94 .nx-eyebrow { color: var(--nx-yellow); background: rgba(0,0,0,.3); }
+    .nx-t94 .nx-h-word { text-shadow: 4px 4px 0 var(--nx-red), 0 0 24px rgba(255,255,255,.15); }
+    .nx-t94 .nx-h-word span { color: var(--nx-yellow); }
+    .nx-t94 .nx-hero .nx-btn { background: rgba(0,0,0,.28); border-color: rgba(255,255,255,.3); color: #fff !important; }
+    .nx-t94 .nx-hero .nx-btn:hover { background: var(--nx-red); border-color: #fff; }
+    .nx-t94 .nx-hero .nx-btn.gold, .nx-t94 .nx-h-mine .nx-btn.gold { background: var(--nx-yellow); border-color: var(--nx-yellow); color: #111 !important; }
+    .nx-t94 .nx-hero .nx-btn.gold:hover { background: #ffdb4d; }
+    .nx-t94 .nx-h-mine { background: rgba(0,0,0,.3); border-color: rgba(255,255,255,.22); }
+    .nx-t94 .nx-h-mine .lab, .nx-t94 .nx-h-mine .nx-star { color: var(--nx-yellow); }
+    .nx-t94 .nx-h-mine .t { color: #fff; }
+    .nx-t94 .nx-h-mine .c, .nx-t94 .nx-h-mine p { color: rgba(255,255,255,.85); }
+    .nx-t94 .nx-h-copy .nx-btn.gold { background: var(--nx-yellow); border-color: var(--nx-yellow); color: #111 !important; }
+    .nx-t94 .nx-h-copy .nx-btn.gold:hover { background: #ffdb4d; }
+
+    .nx-t94 .nx-card { border-color: var(--nx-line2); box-shadow: 0 2px 10px rgba(51,102,204,.08); }
+    .nx-t94 .nx-card-h { background: linear-gradient(180deg, #6F9FD2, #4B7FC0); border-bottom: 2px solid #2A57B0; }
+    .nx-t94 .nx-card-h h2 { color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.25); }
+    .nx-t94 .nx-card-h h2::before { background: var(--nx-red); box-shadow: 5px 0 0 #fff; }
+    .nx-t94 .nx-card-h .nx-meta { color: #EAF2FB; }
+    .nx-t94 .nx-card-h .nx-link { color: #fff; }
+
+    .nx-t94 .nx-h-note { border-left-color: var(--nx-red); border-color: var(--nx-line2); }
+    .nx-t94 .nx-h-note .tag { background: var(--nx-yellow); }
+    .nx-t94 .nx-h-note .nx-btn { background: #1E1E1E; border-color: #1E1E1E; color: #fff !important; }
+    .nx-t94 .nx-h-note .nx-btn:hover { background: var(--nx-blue); border-color: var(--nx-blue); }
+
+    .nx-t94 .nx-h-tab { background: #fff; color: var(--nx-blue); }
+    .nx-t94 .nx-h-tab:hover { color: var(--nx-red); border-color: var(--nx-red); }
+    .nx-t94 .nx-h-tab.on { background: var(--nx-red); border-color: var(--nx-red); color: #fff; }
+    .nx-t94 .nx-h-tab .star { color: var(--nx-yellow); }
+    .nx-t94 .nx-h-game:nth-child(even) { background: #F2F7FC; }
+    .nx-t94 .nx-h-game:hover { background: #FFF6CC; }
+    .nx-t94 .nx-h-tm { color: var(--nx-mute); }
+    .nx-t94 .nx-h-tm.win { color: #111; }
+    .nx-t94 .nx-h-tm.win .c { color: var(--nx-blue); }
+    .nx-t94 .nx-h-tm.mine .n::after { color: #d4a400; }
+    .nx-t94 .nx-h-score { background: #1E1E1E; border-color: #000; color: #8a96a8; }
+    .nx-t94 .nx-h-score .ot { background: var(--nx-yellow); }
+    .nx-t94 .nx-go.box { color: var(--nx-blue) !important; border-color: rgba(51,102,204,.5); }
+    .nx-t94 .nx-go.box:hover { background: var(--nx-blue); color: #fff !important; }
+
+    .nx-t94 .nx-h-copy { color: #26303D; }
+    .nx-t94 .nx-h-copy p a { color: var(--nx-blue) !important; }
+    .nx-t94 .nx-dir-h, .nx-t94 .nx-h-dl-h { color: var(--nx-red); }
+    .nx-t94 .nx-dir a.me { background: #FFF2B3; }
+    .nx-t94 .nx-dir a:hover .n { color: var(--nx-blue); }
+    .nx-t94 .nx-h-dl .get { color: var(--nx-blue); border-color: rgba(51,102,204,.5); }
+    .nx-t94 .nx-h-dl a:hover .get { background: var(--nx-red); border-color: var(--nx-red); color: #fff; }
+    .nx-t94 select { background-image: linear-gradient(45deg, transparent 50%, var(--nx-blue) 50%), linear-gradient(135deg, var(--nx-blue) 50%, transparent 50%) !important; }
+    .nx-t94 .nx-foot { color: #1B2F55; border-top-color: rgba(27,47,85,.25); }
+    .nx-t94 .nx-foot-links a:hover { color: #fff; }
+    .nx-t94 .nx-foot .nx-px { color: var(--nx-red); }
     `);
 
     const teamSide = (team, side, isWin) => {
@@ -986,6 +1069,7 @@
         </aside>
       </div>
     `);
+    app.classList.add('nx-t94');
     return app;
   }
 
