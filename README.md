@@ -30,12 +30,11 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 ## What's new
 
-**v2.0.0:** the "game tonight?" update.
-- 💬 **DM any coach.** Link a coach's Discord once, then **CHAT** opens your DM in one click.
-- ⚙ **Settings, RetroArch style.** Arrow keys, Enter, Esc, just like your emulator. Everything stays in your own browser.
-- 🔎 **Find any league fast.** The league bar sits right under the menu, and you can search all ~286 seasons. Yours wear a ★.
-- 🎯 **Filter by Coach.** One dropdown with logos, coach names and DM buttons.
-- 🔀 **One switch** turns the new look on or off. Day and Night live in Settings now.
+**v2.1.0:** the "whole arena" update.
+- 🏒 **Standings, rosters, stat leaders, records and box scores** all get the new look, in Day and Night.
+- 🏆 **Standings with logos and coaches**, plus a ★ My Team box showing where you sit.
+- 🎨 **Roster pages wear the team's colours**, with a stat strip and a DM button for the coach.
+- 📺 **Broadcast-style box scores**: big logos, a pixel scoreboard and team-coloured stat bars.
 
 See the full [changelog](CHANGELOG.md) for everything else.
 

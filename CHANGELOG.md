@@ -3,6 +3,16 @@
 Every release of **NHL94 – It's In The Script**, newest first, in plain English.
 Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.PATCH**. MAJOR goes up for big shake-ups, MINOR for new stuff, PATCH for fixes and polish.
 
+## [2.1.0] – 2026-10-05
+
+### ✨ New
+- **The whole stats room gets new gear.** Standings, team rosters, player stat leaders, league records, all-time user standings, site records and box scores now all wear the same night-rink look as the coach page, Day mode included.
+- **Standings with faces.** Every team shows its logo and coach, PTS stands out, streaks glow green or red, and your own team gets a ★ My Team box with its spot in the division.
+- **Rosters in team colours.** Each roster page dresses in that team's jersey, with the coach, a Discord DM button, a team picker and a stat strip up top.
+- **Box scores, broadcast style.** Big logos, a pixel scoreboard, the period-by-period line and side-by-side bars for shots, faceoffs, checks and more. The winner's colours take over the page.
+- **Records you can read at a glance.** Every leader board gets its own card, and the leader's number shines in gold.
+- **Sort and flip pages like before.** Every dropdown, sort and page button works just as it did, and the column you sorted by lights up.
+
 ## [2.0.1] – 2026-10-05
 
 ### 🐛 Fixed
@@ -64,6 +74,7 @@ Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.
 - **The coach page, redesigned.** Coach names next to every team, the schedule grouped by opponent, filters that remember you, and a checkpoint countdown.
 - A **Classic / V1** switch so the original site is always one click away.
 
+[2.1.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.4.1...v2.0.0
 [1.4.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.1.2...v1.4.1
