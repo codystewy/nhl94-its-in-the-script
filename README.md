@@ -39,17 +39,26 @@ See the full [changelog](CHANGELOG.md) for everything else.
 
 </details>
 
-## Install (one click)
+## Install: pick your channel
 
 **New to Tampermonkey?** Follow the **[step-by-step install guide](INSTALL.md)** for Chrome, Brave, Firefox and Edge.
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser. On Chrome, Brave or Edge, also turn on **Allow User Scripts** in the extension's details.
-2. Click **[Install the script](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js)**, then click **Install** on the Tampermonkey screen that opens.
+2. Pick **one** channel, click its install link, then click **Install** on the Tampermonkey screen that opens:
+
+   | Channel | What you get | Install |
+   | --- | --- | --- |
+   | 🥅 **Stable** (recommended) | Tested releases only. Steady as a stay-at-home defenceman. | **[Install Stable](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js)** |
+   | ⚡ **Latest** | Every change the moment it's made. Fresh off the bench, the odd wobble included. | **[Install Latest](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/latest/nhl94-its-in-the-script.latest.user.js)** |
+   | 🎉 **Fun** | Latest plus playful extras we're trying out. The goal-horn edition. | **[Install Fun](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js)** |
+
 3. Open [nhl94online.com](https://www.nhl94online.com) or any coach page.
+
+The label at the right end of the VIEW switcher shows which channel you're on. To switch, see [Switching channels](INSTALL.md#switching-channels).
 
 **Redesigned pages so far:** Home and Coach pages. Pages that haven't been redesigned yet look exactly like the original site.
 
-Updates install automatically. Tampermonkey checks this repo for a newer version.
+Updates install automatically. Tampermonkey checks this repo about once a day: Stable updates when a new version is released, and Latest and Fun update with every change.
 
 ## Switching views
 
@@ -90,6 +99,16 @@ The page remembers your choices. Press **Alt + Shift + V** to cycle through the 
 - `dev/preview.sh [team_ID|home] [view]`: draws a live coach page with the script injected using headless Chrome, and saves a screenshot to `dev/out/`.
 - Local live editing: install a small Tampermonkey script that `@require`s `file:///path/to/nhl94-its-in-the-script.user.js`. In Chrome you also need to turn on *Allow access to file URLs* for Tampermonkey. Edits then show up when you refresh the page.
 
-**Releasing:** raise `@version` in the script header (semver) with every change you push to `main`. That's how Tampermonkey knows to update.
+- `dev/build-channel.sh <latest|fun>`: builds a channel's installable file into `dev/out/`. Preview it with `SCRIPT=dev/out/nhl94-its-in-the-script.latest.user.js dev/preview.sh`.
+
+**Channels and releasing:** all work happens on `main`. Each install channel is its own branch:
+
+| Branch | Updated | Version |
+| --- | --- | --- |
+| `stable` | Only on a release: the release commit is pushed to it | `@version` from the script, e.g. `1.5.0` |
+| `latest` | On every push to `main`, by the [channels workflow](.github/workflows/channels.yml) | `@version` plus the commit count, e.g. `1.5.0.63` |
+| `fun` | Same as `latest`, with `CHANNEL = 'fun'` so fun-only extras (`if (FUN) …`) switch on | Same as `latest` |
+
+Tampermonkey only updates when the version goes up. The commit count makes sure every push counts as newer for Latest and Fun. Stable only changes when `@version` is raised at a release. Nobody edits the `latest` or `fun` branches by hand.
 
 *Fan-made and not affiliated with EA Sports, the NHL or nhl94online.com.*
