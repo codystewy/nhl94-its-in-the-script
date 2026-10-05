@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.4.0
+// @version      1.4.1
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -136,6 +136,24 @@
     [...t.rows].forEach((r) => { if (r.cells.length >= 2) profile.push([norm(r.cells[0].textContent).replace(/:$/, ''), norm(r.cells[1].textContent)]); });
   });
 
+  // The site isn't consistent with team names (e.g. "New York" in standings vs "NY Rangers"
+  // in the team list), so map any variant onto a known team, preferring the given division.
+  function resolveTeam(name, division) {
+    name = norm(name);
+    if (!name || teamInfo[name]) return name;
+    const key = (t) => t.toLowerCase().replace(/^ny\b/, 'new york').replace(/[^a-z]/g, '');
+    const want = key(name);
+    let cands = Object.keys(teamInfo).filter((t) => {
+      const k = key(t), full = key(fullTeamName(t));
+      return k === want || full === want || k.startsWith(want) || full.startsWith(want) || want.startsWith(k);
+    });
+    if (cands.length > 1 && division) {
+      const inDiv = cands.filter((t) => teamInfo[t].division === division);
+      if (inDiv.length) cands = inDiv;
+    }
+    return cands.length === 1 ? cands[0] : name;
+  }
+
   // Division standings
   let standings = null;
   const stTable = leafTables().find((t) => /^\S+\s+W L T DNP Pts/.test(firstRowText(t)));
@@ -143,7 +161,7 @@
     standings = { division: norm(stTable.rows[0].cells[0].textContent), rows: [] };
     [...stTable.rows].slice(1).forEach((r) => {
       const c = [...r.cells].map((x) => norm(x.textContent));
-      if (c.length >= 6) standings.rows.push({ team: c[0], w: c[1], l: c[2], t: c[3], dnp: c[4], pts: c[5] });
+      if (c.length >= 6) standings.rows.push({ team: resolveTeam(c[0], standings.division), w: c[1], l: c[2], t: c[3], dnp: c[4], pts: c[5] });
     });
   }
 
@@ -1295,7 +1313,7 @@
       const a = r.cells[0].querySelector('a');
       const txt = norm(r.cells[0].textContent);
       const m = txt.match(/^(\d+)\s*-\s*(\d+)\s+([A-Za-z.]+)?\s*(OT)?/i) || [];
-      const away = norm(r.cells[1].textContent), home = norm(r.cells[3].textContent);
+      const away = resolveTeam(r.cells[1].textContent), home = resolveTeam(r.cells[3].textContent);
       const hi = +m[1] || 0, lo = +m[2] || 0, abbr = m[3] || '';
       let winner = '';
       if (abbr && hi !== lo) winner = abbrScore(abbr, home) > abbrScore(abbr, away) ? home : away;
