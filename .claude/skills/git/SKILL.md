@@ -78,7 +78,7 @@ Use AskUserQuestion. Put the recommended option first:
 
 ## 5. Release (if chosen)
 
-1. Set `// @version      X.Y.Z` in `nhl94-its-in-the-script.user.js`.
+1. Set `// @version      X.Y.Z` **and** `const SCRIPT_VERSION = 'X.Y.Z';` in `nhl94-its-in-the-script.user.js` (the second is shown in the bottom-right switcher).
 2. Insert the CHANGELOG entry at the top (below the intro), plus the compare link at the bottom.
 3. Replace the README `## What's new` section (up to the next `## `) with the new block, keeping the `See the full [changelog](CHANGELOG.md)…` line.
 4. `node --check nhl94-its-in-the-script.user.js`
