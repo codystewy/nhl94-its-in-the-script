@@ -85,11 +85,11 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 ## Channels: Stable · Latest · Fun
 
 - Always work on `main`. Every push automatically rebuilds the **Latest** and **Fun** install branches through `.github/workflows/channels.yml` and `dev/build-channel.sh`. **Stable** only moves on `/git release`.
-- `CHANNEL` (`'stable'|'latest'|'fun'`) and `FUN` are constants near the top of the script, and the build stamps them. Put fun-only extras (custom scrollbars, social feeds…) behind `if (FUN)`, so they reach Fun users without touching Stable. If the user says "make that latest-only", use `if (CHANNEL !== 'stable')`.
+- `CHANNEL` (`'stable'|'latest'|'fun'`) and `FUN` are constants near the top of the script, and the build stamps them. **Fun-only extras** (custom scrollbars, social feeds…) get an entry in `FUN_EXTRAS` (`id: { name, added }`), and every piece of them is wrapped in `if (funOn('id'))`. They most likely never reach Stable. `/git summary` lists them by age, and `/git fun remove <id>` retires one. When the user asks for something playful or says "fun only", build it this way from the start.
 - The switcher shows `v<version>` plus a gold LATEST/FUN tag. To preview a channel build: `dev/build-channel.sh fun && SCRIPT=dev/out/nhl94-its-in-the-script.fun.user.js dev/preview.sh 6716 v1`.
 
 ## Releases and pushing: use the `/git` skill
 
-- `/git push` commits and pushes `main`, which updates Latest and Fun, and never asks about releases. `/git release` bumps the version, writes the CHANGELOG and README "What's new", tags, and moves `stable`. `/git hotfix <commit>` ships one fix to Stable. `/git status` only previews. The full rules (feat → minor, fix/style → patch, docs/chore → no release, breaking → ask about major) live in `.claude/skills/git/SKILL.md`.
+- `/git push` lists the changes since the last push, asks Latest vs Fun only, and pushes `main`. `/git summary` shows what's on Latest but not in Stable, plus the Fun extras. `/git release` bumps the version, writes the CHANGELOG and README "What's new", tags, and moves `stable`. `/git hotfix <commit>` ships one fix to Stable. `/git status` only previews. The full rules (feat → minor, fix/style → patch, docs/chore → no release, breaking → ask about major) live in `.claude/skills/git/SKILL.md`.
 - **Writing style for CHANGELOG and What's new:** plain English and a bit funny, with hockey puns welcome. **No technical jargon** (no "refactor", "tokens", "localStorage", "DOM"). Say what a player notices.
 - The one-line origin note at the top of the README ("It started with just wanting a dark and night mode…") was requested by the user. Keep it, and don't add any other purpose or motivation statements.

@@ -1,7 +1,7 @@
 ---
 name: git
-description: "Git push and releases for the nhl94-its-in-the-script repo, which ships three install channels (Stable, Latest, Fun). /git push commits anything uncommitted (Conventional Commits) and pushes main, which auto-updates Latest + Fun. /git release cuts a SemVer release (CHANGELOG, README What's new, tag) and moves the stable branch. /git hotfix puts one fix on Stable. /git status previews. Use when the user types /git, /git push, /git release, /git hotfix, /git status, or asks to push changes, release, or ship something to stable."
-argument-hint: "push | release | hotfix <commit> | status"
+description: "Git push and releases for the nhl94-its-in-the-script repo, which ships three install channels (Stable, Latest, Fun). /git push lists every change since the last push and asks which channel each goes to (Latest, or Fun only), then pushes. /git summary shows what's on Latest but not yet in Stable and which Fun-only extras exist and how old they are. /git release moves everything on Latest to Stable. Also retires or promotes Fun extras and hotfixes Stable. Use when the user types /git, /git push, /git summary, /git release, /git hotfix, /git status, or asks to push, release, ship to stable, or remove a fun feature."
+argument-hint: "push | summary | release | hotfix <commit> | fun remove <id>"
 ---
 
 # /git: push, release, hotfix
@@ -19,14 +19,21 @@ All work happens on `main`. People install from one of three branches:
 | `fun` | same as latest, built with `CHANNEL = 'fun'` | `X.Y.Z.<commit count>` |
 
 - Never edit `latest` or `fun` by hand. Never push work-in-progress to `stable`.
-- Fun-only extras are gated with `if (FUN)` in the script. Keep that in mind when previewing a release: Stable gets the code, but `FUN` is off there.
+- Fun-only extras are listed in `FUN_EXTRAS` and gated with `if (funOn('id'))`. The code ships in every file, but it only runs on Fun.
+
+How the user thinks about it:
+- **Latest:** where normal work goes. Every push lands here, for people who want everything as soon as it's ready.
+- **Fun only:** playful extras that most likely **never** reach Stable. Retired when they get old.
+- **Stable:** once in a while, the user moves *everything on Latest* to Stable with `/git release`.
 
 | Command | Does |
 | --- | --- |
-| `/git` or `/git push` | Commit + push `main`. No release question. |
-| `/git release` | Version bump, CHANGELOG, README, tag, push, move `stable`, GitHub release. |
+| `/git` or `/git push` | List changes since the last push, ask Latest vs Fun only, push. |
+| `/git summary` | What's on Latest but not in Stable, plus the Fun extras and their age. |
+| `/git release` | Move everything on Latest to Stable (version bump, CHANGELOG, README, tag, GitHub release). |
+| `/git fun remove <id>` | Retire a Fun extra. `/git fun promote <id>` sends it to Latest instead (rare). |
 | `/git hotfix <commit>` | Ship one fix to Stable without everything else on `main`. |
-| `/git status` | Preview only: what's unpushed and what the next release would be. Writes nothing. |
+| `/git status` | Alias of `/git summary`. |
 
 ## Shared steps
 
@@ -63,20 +70,56 @@ One line per change, newest first, grouped by category:
 
 ## /git push (default)
 
-1. Gather, then commit anything uncommitted.
-2. `git push origin main`.
-3. Report in a few lines:
-   - the summary of what was pushed
-   - "Latest + Fun users get this on their next update check (version `X.Y.Z.<count>`)", using `git rev-list --count HEAD`
-   - optionally, one line confirming the workflow started: `gh run list --workflow channels.yml -L 1`
-   - if anything since the last tag is a `feat`/`fix`/`style`/`perf`, add one line: "Stable is N changes behind. Say `/git release` when you're happy."
+1. **Gather.** List every change since the last push: unpushed commits plus uncommitted work, which you split into the logical commits it *would* become. One plain-English line each, numbered. Mark any change that is already a Fun extra (touches `FUN_EXTRAS` / `funOn(`).
+2. **Ask which channel.** Use **one** AskUserQuestion, with the list shown in the question text above it:
+   - **All to Latest** (recommended, first)
+   - **Some are Fun only.** The user then names them by number. Ask a follow-up only for the names or ids if they aren't obvious.
+   - **Cancel**
 
-Don't ask a release question. Don't bump the version.
+   Changes that are already Fun extras stay Fun only. Don't re-ask about them.
+3. **Make the Fun-only ones Fun only** before committing:
+   - Add an entry to `FUN_EXTRAS` near the top of the script: `id: { name: 'Plain name', added: 'YYYY-MM-DD' }`.
+   - Wrap every piece of the feature (CSS, markup, listeners) in `if (funOn('id'))`.
+   - Run `node --check`. Preview with `dev/build-channel.sh fun` + `SCRIPT=… dev/preview.sh` and also the normal script, to confirm Stable and Latest look unchanged.
+   - Commit as `feat(fun): …`.
+   - Fun-only *fixes* to existing Fun extras are `fix(fun): …`.
+   - If a change is only on Fun but was already committed ungated, add a follow-up commit that gates it. Don't rewrite history.
+4. **Commit** the rest (see Shared steps), then `git push origin main`. The workflow rebuilds Latest and Fun.
+5. **Report** in a few lines:
+   - what went to Latest and what went to Fun only
+   - the new channel version `X.Y.Z.<count>` (from `git rev-list --count HEAD`)
+   - "Stable is N changes behind. `/git summary` for the full list."
+
+Never bump the version or touch `stable` here.
+
+## /git summary
+
+Read-only. Show three short sections, in plain English, with no jargon:
+
+1. **On Latest, not yet in Stable:** every `feat`/`fix`/`style`/`perf` since the last tag, excluding `fun` scope, grouped ✨/🐛/🎨. Then one line naming the release it would make, e.g. "Enough for **v1.5.0**. Say `/git release` to move it all to Stable." If there's nothing, say "Stable is up to date."
+2. **Fun extras:** every entry in `FUN_EXTRAS`, oldest first: name, id, age in days (from `added`). Flag anything older than ~60 days as "getting old? `/git fun remove <id>`". If there are none, say "No Fun extras right now."
+3. **Not pushed yet:** count of unpushed commits plus uncommitted changes, if any.
+
+Mention it if the repo is still private.
+
+## /git fun remove <id> / promote <id>
+
+- **remove:**
+  1. Delete the `FUN_EXTRAS` entry and every `if (funOn('id'))` block, along with the CSS and helpers only it used. `grep -n "funOn('id')"` must come back empty.
+  2. Run `node --check`, then preview the Fun build.
+  3. Commit `chore(fun): retire <name>`, then push.
+
+  Fun users lose it on their next update.
+- **promote:**
+  1. Unwrap the `funOn('id')` blocks so the code runs everywhere, and delete the entry.
+  2. Commit `feat(<scope>): <name>`, then push.
+
+  It goes to Latest now and reaches Stable at the next `/git release`.
 
 ## /git release
 
 1. Gather, then commit anything uncommitted.
-2. Summarize every change since `$LAST`.
+2. Summarize every change since `$LAST`. Leave `fun`-scope commits out: Fun extras never reach Stable, so they don't belong in the CHANGELOG.
 3. Decide the version from all commits since the last tag:
 
    | Contains | Release |
@@ -92,7 +135,7 @@ Don't ask a release question. Don't bump the version.
    - a 2–4 sentence release summary
    - the CHANGELOG entry
    - the README What's new block
-   - any `if (FUN)` code that stays off in Stable
+   - a note that Fun extras (`FUN_EXTRAS`) stay off in Stable
 
    Running `/git release` is the go-ahead, so don't ask again unless it's MAJOR.
    - **CHANGELOG entry**, to go at the top of `CHANGELOG.md`, below the intro. Leave out empty groups. Add the compare link at the bottom: `[X.Y.Z]: https://github.com/codystewy/nhl94-its-in-the-script/compare/vLAST...vX.Y.Z`.
@@ -128,10 +171,6 @@ For when Stable needs one fix now, but `main` has unfinished stuff.
 4. `git push origin hotfix:stable --follow-tags`, then `gh release create …`.
 5. Back on `main`: `git merge origin/stable`, resolving the version to the hotfix version, then `git push origin main`. Remove the worktree.
 6. Report.
-
-## /git status
-
-Gather, then summarize. Show what `/git release` *would* produce (version + CHANGELOG preview). List uncommitted changes as "would commit". Write nothing.
 
 ## Reminders
 - **Repo visibility:** while the repo is private, raw install links and auto-updates don't reach anyone. Check with `gh repo view --json visibility -q .visibility`, and mention it in the report if it's still private.

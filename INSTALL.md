@@ -14,7 +14,7 @@ The script comes in three flavours. They all look and work the same way. The dif
 | --- | --- | --- |
 | 🥅 **Stable** (recommended) | Most people. You only get updates when a new version is released. | **[Install Stable](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js)** |
 | ⚡ **Latest** | You want every new feature and fix the moment it's made. Might wobble now and then. | **[Install Latest](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/latest/nhl94-its-in-the-script.latest.user.js)** |
-| 🎉 **Fun** | Everything in Latest, plus playful extras we try out first. | **[Install Fun](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js)** |
+| 🎉 **Fun** | Everything in Latest, plus playful extras that only live here. They come and go. | **[Install Fun](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js)** |
 
 Not sure? Pick **Stable**. You can switch any time.
 

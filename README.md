@@ -50,7 +50,7 @@ See the full [changelog](CHANGELOG.md) for everything else.
    | --- | --- | --- |
    | 🥅 **Stable** (recommended) | Tested releases only. Steady as a stay-at-home defenceman. | **[Install Stable](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js)** |
    | ⚡ **Latest** | Every change the moment it's made. Fresh off the bench, the odd wobble included. | **[Install Latest](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/latest/nhl94-its-in-the-script.latest.user.js)** |
-   | 🎉 **Fun** | Latest plus playful extras we're trying out. The goal-horn edition. | **[Install Fun](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js)** |
+   | 🎉 **Fun** | Latest plus playful extras that only live here. They come and go. The goal-horn edition. | **[Install Fun](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/fun/nhl94-its-in-the-script.fun.user.js)** |
 
 3. Open [nhl94online.com](https://www.nhl94online.com) or any coach page.
 
@@ -107,7 +107,7 @@ The page remembers your choices. Press **Alt + Shift + V** to cycle through the 
 | --- | --- | --- |
 | `stable` | Only on a release: the release commit is pushed to it | `@version` from the script, e.g. `1.5.0` |
 | `latest` | On every push to `main`, by the [channels workflow](.github/workflows/channels.yml) | `@version` plus the commit count, e.g. `1.5.0.63` |
-| `fun` | Same as `latest`, with `CHANNEL = 'fun'` so fun-only extras (`if (FUN) …`) switch on | Same as `latest` |
+| `fun` | Same as `latest`, with `CHANNEL = 'fun'` so the extras listed in `FUN_EXTRAS` (gated with `funOn('id')`) switch on | Same as `latest` |
 
 Tampermonkey only updates when the version goes up. The commit count makes sure every push counts as newer for Latest and Fun. Stable only changes when `@version` is raised at a release. Nobody edits the `latest` or `fun` branches by hand.
 
