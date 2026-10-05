@@ -32,7 +32,7 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 - **Box Score / Log Game** is the second column, right after Gm.
 - Home rows are lighter and away rows darker, and the difference stays subtle.
 - Columns are only as wide as their data, with no wasted space, and column headers can wrap.
-- **Coach filter pills** toggle on and off, can be combined, and are **saved across refreshes** (localStorage, per `team_ID`).
+- The **coach filter** is a dropdown (team logo + coach name + their Discord DM button, no town). Coaches toggle on and off, can be combined, and are **saved across refreshes** (localStorage, per `team_ID`).
 - Every design version can be switched from the **VIEW switcher** (bottom-right), just like Classic on/off. Never remove an old version.
 
 ## Screenshots the user provides

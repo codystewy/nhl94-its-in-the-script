@@ -530,13 +530,40 @@
     .nx-seg button.on { background: var(--nx-red); color: var(--nx-on-red); }
     .nx-seg button .n { opacity: .65; margin-left: 5px; }
     .nx-lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-dim); letter-spacing: .5px; margin-right: 4px; }
-    .nx-pill { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2);
-      border: 1px solid var(--nx-line2); border-radius: 999px; padding: 3px 11px 3px 4px; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s; }
-    .nx-pill .nx-logo { width: 20px; height: 20px; image-rendering: pixelated; }
-    .nx-pill small { color: var(--nx-dim); font-size: 11px; }
-    .nx-pill:hover { border-color: var(--nx-acc); }
-    .nx-pill.on { background: var(--nx-red); color: var(--nx-on-red); border-color: var(--nx-gold); box-shadow: inset 0 0 0 1px var(--nx-gold); }
-    .nx-pill.on small { color: inherit; opacity: .75; }
+    .nx-ctrl-row { justify-content: space-between; }
+    .nx-cf { position: relative; display: flex; align-items: center; gap: 6px; }
+    .nx-cf-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px 4px 12px; font: 600 13px var(--nx-ui); color: var(--nx-text);
+      background: var(--nx-bg2); border: 1px solid var(--nx-line2); border-radius: 6px; cursor: pointer; white-space: nowrap; }
+    .nx-cf-btn .nx-lab { margin-right: 2px; }
+    .nx-cf-btn:hover, .nx-cf-btn[aria-expanded="true"] { border-color: var(--nx-acc); }
+    .nx-cf-btn.on { border-color: var(--nx-gold); box-shadow: inset 0 0 0 1px var(--nx-gold); }
+    .nx-cf-btn:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
+    .nx-cf-val { display: inline-flex; align-items: center; gap: 7px; }
+    .nx-cf-val .logos { display: inline-flex; }
+    .nx-cf-val .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; }
+    .nx-cf-val .nx-logo + .nx-logo { margin-left: -6px; }
+    .nx-cf-car { width: 0; height: 0; margin-left: 2px; border: 5px solid transparent; border-top: 6px solid var(--nx-mute); border-bottom: 0; font-size: 0; transition: transform .15s; }
+    .nx-card:has(.nx-cf-menu:not([hidden])) { overflow: visible; } /* let the open menu hang past a short schedule */
+    .nx-cf-btn[aria-expanded="true"] .nx-cf-car { transform: rotate(180deg); }
+    .nx-cf-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 320px; max-width: calc(100vw - 32px); max-height: 420px; overflow-y: auto;
+      padding: 6px; background: var(--nx-card); border: 1px solid var(--nx-line2); border-top: 3px solid var(--nx-red); border-radius: 0 0 10px 10px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+    .nx-cf-menu[hidden] { display: none; }
+    .nx-cf-item { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+    .nx-cf-item:hover, .nx-cf-item:focus-visible { background: var(--nx-card2); outline: none; }
+    .nx-cf-item:focus-visible { box-shadow: inset 0 0 0 2px var(--nx-gold); }
+    .nx-cf-item.all { border-bottom: 1px solid var(--nx-line); border-radius: 6px 6px 0 0; margin-bottom: 4px; }
+    .nx-cf-item .nx-logo { width: 26px; height: 26px; image-rendering: pixelated; flex: none; }
+    .nx-cf-item .nm { flex: 1; min-width: 0; font: 600 14px var(--nx-ui); color: var(--nx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nx-cf-item .nx-dc-slot { margin-left: auto; flex: none; }
+    .nx-cf-box { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border: 2px solid var(--nx-line2); border-radius: 2px;
+      font: 400 8px/1 var(--nx-px); color: var(--nx-on-red); }
+    .nx-cf-item[aria-checked="true"] .nx-cf-box { background: var(--nx-red); border-color: var(--nx-gold); }
+    .nx-cf-item[aria-checked="true"] .nx-cf-box::after { content: '✓'; font: 700 11px var(--nx-ui); }
+    .nx-cf-item[aria-checked="true"] { background: var(--nx-card2); }
+    .nx-cf-item .nx-dc { min-width: 78px; justify-content: center; }
+    .nx-cf-item .nx-dc-edit { display: none; }
+    @media (max-width: 560px) { .nx-cf-menu { right: auto; left: 0; } }
     .nx-clear { font: 600 12px var(--nx-ui); color: var(--nx-acc); background: none; border: 0; cursor: pointer; padding: 3px 6px; }
     .nx-clear[hidden] { display: none; }
 
@@ -1429,10 +1456,16 @@
       </div>`;
     })() : '';
 
-    const pillsHtml = groups.map((g) => {
-      const info = teamInfo[g.opp];
-      return `<button type="button" class="nx-pill" data-opp="${esc(g.opp)}">${logoImg(g.opp)}${esc(info ? info.coach : g.opp)}<small>${esc(g.opp)}</small></button>`;
-    }).join('');
+    // Coach filter dropdown: logo + coach + their Discord DM button, pick one or more.
+    const coachOf = (opp) => (teamInfo[opp] && teamInfo[opp].coach) || opp;
+    const coachFilterHtml = `<div class="nx-cf">
+        <button type="button" class="nx-cf-btn" aria-haspopup="true" aria-expanded="false" title="Show games against these coaches"><span class="nx-lab">COACH</span><span class="nx-cf-val"></span><span class="nx-cf-car" aria-hidden="true"></span></button>
+        <button type="button" class="nx-clear" id="nx-clear" hidden>Clear</button>
+        <div class="nx-cf-menu" role="menu" aria-label="Filter by coach" hidden>
+          <div class="nx-cf-item all" role="menuitemradio" tabindex="-1" data-opp=""><span class="nx-cf-box" aria-hidden="true"></span><span class="nm">All coaches</span></div>
+          ${groups.map((g) => `<div class="nx-cf-item" role="menuitemcheckbox" tabindex="-1" data-opp="${esc(g.opp)}" title="${esc(fullTeamName(g.opp))}">
+            <span class="nx-cf-box" aria-hidden="true"></span>${logoImg(g.opp)}<span class="nm">${esc(coachOf(g.opp))}</span>${dcSlot(teamInfo[g.opp] && teamInfo[g.opp].coach)}</div>`).join('')}
+        </div></div>`;
 
     const schedRows = groups.map((g) => {
       const info = teamInfo[g.opp] || {};
@@ -1510,8 +1543,8 @@
                     <button type="button" data-v="todo">To Play<span class="n">${games.length - playedCount}</span></button>
                     <button type="button" data-v="done">Final<span class="n">${playedCount}</span></button>
                   </div>
+                  ${coachFilterHtml}
                 </div>
-                <div class="nx-ctrl-row"><span class="nx-lab">COACH</span>${pillsHtml}<button type="button" class="nx-clear" id="nx-clear" hidden>Clear</button></div>
               </div>
               <table class="nx-sched">
                 <thead><tr><th>Gm</th><th></th><th>H/A</th><th style="text-align:right">Score</th><th style="text-align:center">Res</th><th>Played</th></tr></thead>
@@ -1562,8 +1595,32 @@
     const seg = $('#nx-seg', app);
     const clearBtn = $('#nx-clear', app);
 
+    const cfMenu = $('.nx-cf-menu', app), cfBtn = $('.nx-cf-btn', app);
+    const setCf = (open) => {
+      cfMenu.hidden = !open;
+      cfBtn.setAttribute('aria-expanded', String(open));
+      if (open) ($('.nx-cf-item[aria-checked="true"]', cfMenu) || $('.nx-cf-item', cfMenu)).focus();
+    };
+    // "All coaches" clears; a coach toggles on/off (several can be on). The menu stays open for more picks.
+    const pickCoach = (o) => {
+      if (!o) selected.clear(); else if (selected.has(o)) selected.delete(o); else selected.add(o);
+      store.set('opp:' + pageKey, [...selected]);
+      apply();
+    };
+    document.addEventListener('click', (e) => { if (!cfMenu.hidden && !e.target.closest('.nx-cf') && !e.target.closest('.nx-set')) setCf(false); });
+    cfMenu.addEventListener('keydown', (e) => {
+      const items = $$('.nx-cf-item', cfMenu), i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus(); }
+      else if ((e.key === 'Enter' || e.key === ' ') && i >= 0 && e.target === items[i]) { e.preventDefault(); pickCoach(items[i].dataset.opp); }
+      else if (e.key === 'Escape' || e.key === 'Tab') { if (e.key === 'Escape') { e.stopPropagation(); cfBtn.focus(); } setCf(false); }
+    });
+
     function apply() {
-      $$('.nx-pill', app).forEach((b) => b.classList.toggle('on', selected.has(b.dataset.opp)));
+      $$('.nx-cf-item', app).forEach((it) => it.setAttribute('aria-checked', String(it.dataset.opp ? selected.has(it.dataset.opp) : !selected.size)));
+      const picked = groups.filter((g) => selected.has(g.opp));
+      $('.nx-cf-val', app).innerHTML = !picked.length ? '<span class="nm">All coaches</span>'
+        : `<span class="logos">${picked.slice(0, 3).map((g) => logoImg(g.opp)).join('')}</span><span class="nm">${picked.length === 1 ? esc(coachOf(picked[0].opp)) : picked.length + ' coaches'}</span>`;
+      $('.nx-cf-btn', app).classList.toggle('on', !!picked.length);
       $$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.v === mode));
       clearBtn.hidden = !selected.size;
       $$('tr.nx-grp', tbody).forEach((h) => {
@@ -1581,13 +1638,9 @@
     }
 
     app.addEventListener('click', (e) => {
-      const pill = e.target.closest('.nx-pill');
-      if (pill) {
-        const o = pill.dataset.opp;
-        if (selected.has(o)) selected.delete(o); else selected.add(o);
-        store.set('opp:' + pageKey, [...selected]);
-        return apply();
-      }
+      if (e.target.closest('.nx-cf-btn')) return setCf(cfMenu.hidden);
+      const it = !e.target.closest('.nx-dc-slot') && e.target.closest('.nx-cf-item');
+      if (it) return pickCoach(it.dataset.opp);
       if (e.target === clearBtn) { selected.clear(); store.set('opp:' + pageKey, []); return apply(); }
       const sb = e.target.closest('#nx-seg button');
       if (sb) { mode = sb.dataset.v; store.set('mode:' + pageKey, mode); return apply(); }

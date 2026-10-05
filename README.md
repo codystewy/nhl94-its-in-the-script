@@ -87,7 +87,7 @@ The page remembers your choices. Press **Alt + Shift + V** to cycle through the 
 - **Team colors:** every coach page is themed in that team's own colors (1993-94 era), in both Day and Night mode. The home page uses the original site's red, white and blue.
 - **Coach names everywhere:** on the schedule, standings, filters and league list.
 - **Schedule grouped by opponent:** one header per opponent with their logo, coach, your record against them, a box per game for wins and losses, and games left. Click a header to collapse it.
-- **Filters:** All / To Play / Final tabs, plus coach pills you can switch on and off. Both are saved per coach page.
+- **Filters:** All / To Play / Final tabs, plus a coach dropdown (logo, coach name and a Discord DM button) where you can pick one or more coaches. Both are saved per coach page.
 - **Checkpoint tracker:** games left, a progress bar and a countdown that turns red as the deadline gets close.
 - **Quick actions:** **Log Game** and **Box Score** sit right next to each game.
 - **Clear home and away rows:** home rows are lighter and away rows are darker.
