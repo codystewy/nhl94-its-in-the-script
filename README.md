@@ -91,7 +91,7 @@ Updates install automatically. Tampermonkey checks this repo about once a day: S
 
 The bottom-right corner of every redesigned page has two controls:
 
-- **The switch:** one click turns the new look (**V1** · *Rink Night*, a dark NHL 26 broadcast look with 16-bit touches) on or off. Off shows the original nhl94online.com page, untouched. **Alt + Shift + V** does the same.
+- **The switch:** one click turns the new look (*Rink Night*, a dark NHL 26 broadcast look with 16-bit touches) on or off. Its label shows the script's version (**v2**). Off shows the original nhl94online.com page, untouched. **Alt + Shift + V** does the same.
 - **The ⚙ gear** opens Settings (see below).
 
 The page remembers your choice. New designs are added as new versions; old ones stay available.
