@@ -313,7 +313,7 @@
       '--nx-hero1': hero, '--nx-red': btn, '--nx-on-red': onColor(btn),
       '--nx-gold': gold, '--nx-on-gold': onColor(gold),
       '--nx-acc-n': acc.n || readableOn('#141C2F', gold, 4.5),
-      '--nx-acc-d': acc.d || readableOn('#FFFFFF', gold, 4.5),
+      '--nx-acc-d': acc.d || readableOn('#E3EBF5', gold, 5.5), // checked on the darkest Day surface (team header rows), with room to spare for small text
     };
   }
   // Home: the original site's royal blue, dark red and yellow (links stay the site's blue in Day mode).
