@@ -91,7 +91,7 @@ A **VIEW** switcher sits in the bottom-right corner of every redesigned page:
 
 Next to the views there's a **☀ Day / ☾ Night** toggle. Night is the default, and the choice applies to every page.
 
-The **⚙** button opens **Settings**: a retro menu that lists everything the script has saved in your browser (My Leagues, Discord links, look, intros, schedule filters) and clears one part at a time. It's also where you replay the My Leagues and Discord intros, and download or restore a backup.
+The **⚙** gear opens **Settings**, a menu styled after RetroArch's, so it feels right at home. Use the arrow keys and Enter (or the mouse), and ← / Esc to go back. It lists everything the script has saved in your browser (My Leagues, Discord links, look, intros, schedule filters) and clears one part at a time. It's also where you link coaches' Discord DMs, replay the intros, and download or restore a backup.
 
 The page remembers your choices. Press **Alt + Shift + V** to cycle through the views. New designs are added as new versions; old ones stay available.
 

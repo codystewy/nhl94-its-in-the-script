@@ -1935,8 +1935,6 @@
     .nx-dc:focus-visible, .nx-dc-edit:focus-visible { outline: 2px solid var(--nx-gold, #F1BE48); outline-offset: 2px; }
     @media (hover: none) { .nx-dc-edit { opacity: 1; } }
 
-    .nx-sw-gear { font-size: 15px !important; line-height: 1; }
-
     .nx-dci-cursor { position: fixed; left: 0; top: 0; width: 24px; height: 38px; pointer-events: none; transform-origin: 0 0; z-index: 2;
       filter: drop-shadow(2px 2px 0 rgba(0,0,0,.6)); }
     .nx-dci-cursor svg { width: 100%; height: 100%; display: block; }
@@ -1950,75 +1948,52 @@
     .nx-dci-card .tip b.gear { width: auto; height: auto; padding: 1px 4px; font: 13px/1 system-ui, sans-serif; border-radius: 3px; }
     .nx-mli-card.up::before { top: auto; bottom: -12px; border: 3px solid var(--nx-gold); border-left: 0; border-top: 0; }
 
-    .nx-set { position: fixed; inset: 0; z-index: 2147483200; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px; background: rgba(2,4,24,.8); }
-    .nx-set::after { content: ''; position: fixed; inset: 0; pointer-events: none;
-      background: repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px); }
-    .nx-set-box { position: relative; width: min(760px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column;
-      color: #e9edff; font: 400 14px/1.45 Inter, "Segoe UI", system-ui, sans-serif; text-align: left;
-      background: linear-gradient(180deg, #2a40c4 0%, #16237f 55%, #0b1350 100%);
-      border: 4px solid #f4f4f4; box-shadow: 0 0 0 4px #000, 0 0 0 8px #5a6fe0, 0 0 0 12px #000, 14px 14px 0 12px rgba(0,0,0,.55);
-      animation: nx-set-on .32s steps(6) both; }
-    .nx-set-sm .nx-set-box { width: min(500px, 100%); }
-    @keyframes nx-set-on { from { transform: scaleY(.02) scaleX(.6); filter: brightness(3); } to { transform: none; filter: none; } }
-    .nx-set-h { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #0a0f3a; border-bottom: 4px solid #f4f4f4; }
-    .nx-set-h h2 { flex: 1; margin: 0; font: 400 16px/1.3 "Press Start 2P", monospace; letter-spacing: 1px; text-transform: uppercase; color: #ffd84a; text-shadow: 3px 3px 0 #b3261e; }
-    .nx-set-h h2 small { display: block; margin-top: 8px; font-size: 8px; color: #8fa2ff; text-shadow: none; letter-spacing: .5px; }
-    .nx-set-h h2 small i { font-style: normal; animation: nx-set-blink 1s steps(1) infinite; }
-    @keyframes nx-set-blink { 50% { opacity: 0; } }
-    .nx-set-b { padding: 4px 16px 18px; overflow-y: auto; }
-    .nx-set-intro { margin: 12px 2px 0; font-size: 13px; color: #c4cbf0; }
-    .nx-set-sec { margin-top: 16px; border: 3px solid #000; background: rgba(0,0,30,.35); box-shadow: inset 0 0 0 2px #6f82ea; }
-    .nx-set-sh { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #0a0f3a; }
-    .nx-set-sh h3 { flex: 1; margin: 0; font: 400 11px/1.4 "Press Start 2P", monospace; letter-spacing: 1px; text-transform: uppercase; color: #7fe0ff; }
-    .nx-set-sh h3 b { color: #ffd84a; font-weight: 400; margin-right: 8px; }
-    .nx-set-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 11px 12px; border-top: 2px dashed rgba(255,255,255,.12); }
-    .nx-set-sh + .nx-set-row { border-top: 0; }
-    .nx-set-row > .info { flex: 1 1 260px; min-width: 0; }
-    .nx-set-row .lbl { font-weight: 600; color: #fff; }
-    .nx-set-row .lbl::before { content: '▶'; display: inline-block; width: 18px; font-size: 11px; color: #ffd84a; visibility: hidden; }
-    .nx-set-row:hover .lbl::before, .nx-set-row:focus-within .lbl::before { visibility: visible; animation: nx-set-blink .8s steps(1) infinite; }
-    .nx-set-row .val { margin: 6px 0 0 18px; font: 400 9px/1.7 "Press Start 2P", monospace; color: #ffd84a; overflow-wrap: anywhere; }
-    .nx-set-row .hint { margin: 4px 0 0 18px; font-size: 13px; color: #c4cbf0; overflow-wrap: anywhere; }
-    .nx-set-row .key { margin: 5px 0 0 18px; font: 12px ui-monospace, Menlo, Consolas, monospace; color: #9aa8ff; overflow-wrap: anywhere; }
-    .nx-set-row .acts { display: flex; flex-wrap: wrap; gap: 8px; }
-    .nx-set-empty { padding: 12px 12px 12px 30px; font-size: 13px; color: #c4cbf0; }
-    .nx-set-btn { position: relative; min-height: 36px; padding: 10px 12px; font: 400 9px/1.2 "Press Start 2P", monospace; letter-spacing: .5px;
-      text-transform: uppercase; text-decoration: none; color: #fff; background: #c8102e; border: 3px solid #000; border-radius: 0; cursor: pointer;
-      box-shadow: inset -3px -3px 0 rgba(0,0,0,.35), inset 3px 3px 0 rgba(255,255,255,.3); display: inline-flex; align-items: center; gap: 6px; }
-    .nx-set-btn:hover { filter: brightness(1.15); }
-    .nx-set-btn:active { transform: translate(2px, 2px); box-shadow: none; }
-    .nx-set-btn:focus-visible, .nx-set-in:focus-visible { outline: 3px solid #ffd84a; outline-offset: 2px; }
-    .nx-set-btn.alt { background: #3a55d8; }
-    .nx-set-btn.dc { background: #5865F2; }
-    .nx-set-btn.dc svg { width: 14px; height: 12px; flex: none; }
-    .nx-set-btn[aria-pressed="true"], .nx-set-btn.gold { color: #111; background: #ffd84a; }
-    .nx-set-btn.armed { color: #111; background: #ffd84a; animation: nx-set-blink .5s steps(1) infinite; }
-    .nx-set-btn:disabled { opacity: .4; cursor: default; filter: none; transform: none; }
-    .nx-set-x { min-height: 0; padding: 8px 10px; font-size: 11px; }
-    .nx-set-form { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-top: 2px dashed rgba(255,255,255,.12); }
-    .nx-set-in { flex: 1 1 180px; min-width: 0; min-height: 36px; padding: 8px 10px; font: 14px ui-monospace, Menlo, Consolas, monospace; color: #fff;
-      background: #050a2e; border: 3px solid #000; border-radius: 0; box-shadow: inset 0 0 0 2px #6f82ea; }
-    .nx-set-in::placeholder { color: #7d88c4; }
-    .nx-set-in:focus { box-shadow: inset 0 0 0 2px #ffd84a; outline: none; }
-    .nx-set-in.coach { flex: 0 1 170px; }
-    .nx-set-msg { min-height: 14px; margin: 12px 2px 0; font: 400 9px/1.6 "Press Start 2P", monospace; color: #7CFC9A; }
-    .nx-set-msg.err { color: #ff8a8a; }
-    .nx-set-confirm { margin: 0 12px 12px; padding: 10px 12px; font-size: 13px; color: #fff; background: rgba(0,0,0,.35); border: 2px solid #ffd84a; }
-    .nx-set-confirm .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .nx-set-f { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: #0a0f3a; border-top: 4px solid #f4f4f4; }
-    .nx-set-f .ver { margin-right: auto; font: 400 8px/1.6 "Press Start 2P", monospace; color: #8a96d8; }
-    .nx-set-steps { margin: 10px 0 0; padding-left: 22px; font-size: 13px; color: #c4cbf0; }
-    .nx-set-steps code { font-size: 12px; color: #9aa8ff; }
+    /* Settings: RetroArch's RGUI menu (checkerboard, gold frame, "> " cursor). Same look on every page, team and mode. */
+    .nx-sw-gear svg { width: 16px; height: 16px; display: block; transition: transform .3s steps(4); }
+    .nx-sw-gear[aria-expanded="true"] svg { transform: rotate(90deg); }
+    .nx-set { position: fixed; inset: 0; z-index: 2147483200; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 12px;
+      background: rgba(0,0,0,.72); }
+    .nx-rg { width: min(820px, 100%); height: min(600px, calc(100vh - 24px)); padding: 14px; outline: none; image-rendering: pixelated;
+      background: repeating-conic-gradient(#c07f2c 0 25%, #6b4215 0 50%) 0 0 / 8px 8px; box-shadow: 0 24px 70px rgba(0,0,0,.7);
+      font: 400 24px/1.15 "VT323", "Courier New", monospace; color: #e6e6e6; text-align: left; letter-spacing: .5px; }
+    .nx-rg-in { height: 100%; display: flex; flex-direction: column; padding: 12px 22px 10px;
+      background: repeating-conic-gradient(#272727 0 25%, #333 0 50%) 0 0 / 8px 8px; }
+    .nx-rg-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; color: #e8a838; }
+    .nx-rg-head h2 { margin: 0; font: inherit; font-size: 28px; letter-spacing: 2px; text-transform: uppercase; color: #e8a838; white-space: nowrap; }
+    .nx-rg-back { justify-self: start; font: inherit; font-size: 20px; color: #8a8a8a; background: none; border: 0; padding: 0 4px; cursor: pointer; }
+    .nx-rg-back:hover, .nx-rg-back:focus-visible { color: #e8a838; outline: none; }
+    .nx-rg-ver { justify-self: end; font-size: 20px; }
+    .nx-rg-list { flex: 1; min-height: 0; overflow-y: auto; margin: 10px 0 8px; scrollbar-width: thin; scrollbar-color: #e8a838 transparent; }
+    .nx-rg-row { position: relative; display: flex; align-items: baseline; gap: 16px; padding: 1px 6px 1px 30px; cursor: pointer; white-space: nowrap; }
+    .nx-rg-row .l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .nx-rg-row .v { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; color: #e6e6e6; }
+    .nx-rg-row .v.dots { color: #6e6e6e; letter-spacing: 4px; }
+    .nx-rg-row.sel, .nx-rg-row.sel .v { color: #e8a838; }
+    .nx-rg-row.sel::before { content: '>'; position: absolute; left: 8px; }
+    .nx-rg-row.off { color: #7d7d7d; cursor: default; }
+    .nx-rg-row.armed .v { color: #ff7a5c; animation: nx-rg-blink .6s steps(1) infinite; }
+    @keyframes nx-rg-blink { 50% { opacity: 0; } }
+    .nx-rg-text { margin: 0 0 10px; padding-left: 30px; font-size: 21px; line-height: 1.1; color: #b9b9b9; white-space: normal; }
+    .nx-rg-text b { font-weight: 400; color: #e6e6e6; }
+    .nx-rg-field { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 12px; padding-left: 30px; }
+    .nx-rg-field input { flex: 1; min-width: 0; font: inherit; color: #fff; background: #1b1b1b; border: 0; border-bottom: 2px solid #e8a838;
+      padding: 2px 6px; caret-color: #e8a838; }
+    .nx-rg-field input:focus { outline: none; background: #111; }
+    .nx-rg-field input::placeholder { color: #6e6e6e; }
+    .nx-rg-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; min-height: 2.3em; color: #e8a838; }
+    .nx-rg-foot .help { flex: 1; min-width: 0; white-space: normal; line-height: 1.1; }
+    .nx-rg-foot .help.err { color: #ff7a5c; }
+    .nx-rg-foot .clock { flex: none; }
     @media (max-width: 560px) {
-      .nx-set { padding: 14px; }
-      .nx-set-box { box-shadow: 0 0 0 3px #000, 0 0 0 6px #5a6fe0, 0 0 0 9px #000; max-height: calc(100vh - 28px); }
-      .nx-set-b { padding: 4px 10px 14px; }
-      .nx-set-h h2 { font-size: 12px; }
-      .nx-set-in.coach { flex-basis: 100%; }
+      .nx-rg { padding: 10px; font-size: 21px; }
+      .nx-rg-in { padding: 10px 12px 8px; }
+      .nx-rg-head { grid-template-columns: auto 1fr auto; }
+      .nx-rg-head h2 { font-size: 23px; text-align: center; }
+      .nx-rg-row { padding-left: 24px; gap: 10px; }
+      .nx-rg-row.sel::before { left: 4px; }
+      .nx-rg-text, .nx-rg-field { padding-left: 24px; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .nx-set-box, .nx-set-btn.armed, .nx-set-h h2 small i, .nx-set-row:hover .lbl::before, .nx-set-row:focus-within .lbl::before { animation: none; }
-    }
+    @media (prefers-reduced-motion: reduce) { .nx-rg-row.armed .v { animation: none; } .nx-sw-gear svg { transition: none; } }
     `);
     // Chips repaint whenever a link changes; one click handler serves every chip on the page.
     document.addEventListener('nx:coachlinks', () => $$('.nx-dc-slot').forEach((el) => { el.innerHTML = dcInner(el.dataset.coach, !!el.dataset.full); }));
@@ -2026,72 +2001,6 @@
       const b = e.target.closest('.nx-dc-slot [data-dc-link]');
       if (b) { e.preventDefault(); e.stopPropagation(); openDcDialog(b.closest('.nx-dc-slot').dataset.coach, b); }
     });
-  }
-
-  // Shared retro window: returns { el, box, close }. Esc / backdrop / ✕ close it and focus goes back to the opener.
-  function setWindow(cls, html, opener) {
-    setSetup();
-    const el = document.createElement('div');
-    el.className = 'nx-set ' + cls;
-    el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
-    el.innerHTML = html;
-    document.body.appendChild(el);
-    const box = $('.nx-set-box', el);
-    const onKey = (e) => { if (e.key === 'Escape' && $$('.nx-set').pop() === el) { e.stopPropagation(); close(); } }; // only the top window
-    function close() {
-      el.remove();
-      document.removeEventListener('keydown', onKey, true);
-      if (opener && opener.isConnected) opener.focus();
-      el.dispatchEvent(new CustomEvent('nx:closed'));
-    }
-    document.addEventListener('keydown', onKey, true);
-    el.addEventListener('click', (e) => { if (e.target === el || e.target.closest('[data-set="close"]')) close(); });
-    return { el, box, close };
-  }
-
-  // Two-click confirm for destructive buttons: first click arms ("Sure?"), second within 3s runs it.
-  function armed(btn) {
-    if (btn.classList.contains('armed')) { btn.classList.remove('armed'); clearTimeout(btn._nxArm); return true; }
-    btn.dataset.txt = btn.textContent;
-    btn.textContent = 'Sure? Click again';
-    btn.classList.add('armed');
-    btn._nxArm = setTimeout(() => { btn.classList.remove('armed'); btn.textContent = btn.dataset.txt; }, 3000);
-    return false;
-  }
-
-  const DC_HOWTO = `<ol class="nx-set-steps"><li>In Discord, open your DM with them. If you've never chatted, send them a message first.</li>
-    <li>Right-click any message in that DM and choose <b>Copy Message Link</b>.</li>
-    <li>Paste it here. It looks like <code>https://discord.com/channels/@me/123…</code></li></ol>`;
-
-  // Small window to link (or change / remove) one coach's Discord.
-  function openDcDialog(coach, opener) {
-    const cur = coachLinks.get(coach);
-    const w = setWindow('nx-set-sm', `<div class="nx-set-box" aria-labelledby="nx-dcd-title">
-      <div class="nx-set-h"><h2 id="nx-dcd-title">Link Discord<small>Coach ${esc(coach)}</small></h2>
-        <button type="button" class="nx-set-btn alt nx-set-x" data-set="close" aria-label="Close">✕</button></div>
-      <form class="nx-set-b">
-        ${DC_HOWTO}
-        <div class="nx-set-form" style="padding:12px 0 0;border:0">
-          <input class="nx-set-in" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a message link from your DM…" aria-label="Discord DM link for ${esc(coach)}" value="${esc(cur ? cur.url : '')}">
-        </div>
-        <div class="nx-set-msg" role="status" aria-live="polite"></div>
-        <div class="acts" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
-          <button type="submit" class="nx-set-btn gold">Save</button>
-          ${cur ? '<button type="button" class="nx-set-btn" data-set="unlink">Remove link</button>' : ''}
-          <button type="button" class="nx-set-btn alt" data-set="close">Cancel</button>
-        </div>
-      </form></div>`, opener);
-    const input = $('input', w.el), m = $('.nx-set-msg', w.el);
-    $('form', w.el).addEventListener('submit', (e) => {
-      e.preventDefault();
-      const err = coachLinks.set(coach, input.value);
-      if (err) { m.className = 'nx-set-msg err'; m.textContent = err; input.focus(); return; }
-      w.close();
-    });
-    w.el.addEventListener('click', (e) => { const b = e.target.closest('[data-set="unlink"]'); if (b && armed(b)) { coachLinks.remove(coach); w.close(); } });
-    input.focus();
-    input.select();
   }
 
   // ---------- Discord DM intro: a pixel cursor clicks "+ DM" and it turns into "Chat" ----------
@@ -2213,150 +2122,304 @@
     $('.go', card).focus();
   }
 
-  // Everything the script saves, by area. Each row clears just its own part.
+  // ---------- Settings: a RetroArch-style (RGUI) menu ----------
+  // Menus are pages of rows. ↑/↓ or the mouse picks a row, Enter / → / click opens it, ← / Esc / Backspace goes back.
+  // Rows that delete something ask for a second press ("Press again").
+  const GEAR_SVG = '<svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="'
+    + 'M7 0h2v3h-2zM7 13h2v3h-2zM0 7h3v2h-3zM13 7h3v2h-3zM2 2h2v2h-2zM12 2h2v2h-2zM2 12h2v2h-2zM12 12h2v2h-2z'
+    + 'M4 3h8v1h1v8h-1v1h-8v-1h-1v-8h1zM6 6h4v4h-4z"/></svg>';
   const OLD_KEYS = { 'nx:classic': 'Old Classic view switch', 'nx:myteam': 'Old "my team" pin' };
-  function openSettings(opener) {
-    const w = setWindow('', `<div class="nx-set-box" aria-labelledby="nx-set-title">
-      <div class="nx-set-h"><h2 id="nx-set-title">⚙ Settings<small><i>▶</i> Everything saved in this browser</small></h2>
-        <button type="button" class="nx-set-btn alt nx-set-x" data-set="close" aria-label="Close settings">✕</button></div>
-      <div class="nx-set-b"></div>
-      <div class="nx-set-f"><span class="ver">It's In The Script v${SCRIPT_VERSION} · ${CHANNEL}</span>
-        <button type="button" class="nx-set-btn" data-set="reset-all">Reset everything</button>
-        <button type="button" class="nx-set-btn gold" data-set="close">Done</button></div>
-      <input type="file" accept=".json,application/json" hidden></div>`, opener);
-    const body = $('.nx-set-b', w.el), fileIn = $('input[type=file]', w.el);
-    let note = { text: '', err: false }, pending = null;
-    const say = (text, err) => { note = { text, err: !!err }; paint(); };
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+
+  // Link (or change / remove) one coach's Discord DM: opens the menu straight on that page.
+  function openDcDialog(coach, opener) { openSettings(opener, { id: 'dcInput', coach, only: true }); }
+
+  function openSettings(opener, start) {
+    setSetup();
+    if (!document.querySelector('link[href*="VT323"]')) {
+      const f = document.createElement('link');
+      f.rel = 'stylesheet';
+      f.href = 'https://fonts.googleapis.com/css2?family=VT323&display=swap';
+      document.head.appendChild(f);
+    }
+    const el = document.createElement('div');
+    el.className = 'nx-set';
+    el.innerHTML = '<div class="nx-rg" role="dialog" aria-modal="true" aria-labelledby="nx-rg-title" tabindex="-1"><div class="nx-rg-in"></div></div>';
+    document.body.appendChild(el);
+    const box = $('.nx-rg', el), inner = $('.nx-rg-in', el), fileIn = document.createElement('input');
+    fileIn.type = 'file'; fileIn.accept = '.json,application/json';
+    if (opener && opener.matches('.nx-sw-gear')) opener.setAttribute('aria-expanded', 'true');
+
+    const stack = [start ? { ...start, sel: 0 } : { id: 'root', sel: 0 }];
+    let armedAt = '', armTimer = 0, flash = { text: '', err: false }, flashTimer = 0, items = [];
+    const top = () => stack[stack.length - 1];
+    const say = (text, err) => { flash = { text, err: !!err }; clearTimeout(flashTimer); flashTimer = setTimeout(() => { flash = { text: '' }; paint(); }, 3500); paint(); };
+    const go = (id, args = {}) => { stack.push({ id, sel: 0, ...args }); armedAt = ''; flash = { text: '' }; paint(); };
+    const back = () => { if (stack.length > 1 && !top().only) { stack.pop(); armedAt = ''; flash = { text: '' }; paint(); } else close(); };
 
     const ls = () => { const o = {}; try { Object.keys(localStorage).forEach((k) => { if (k.startsWith('nx:') && !k.startsWith('nx:gm:')) o[k] = localStorage.getItem(k); }); } catch (e) {} return o; };
     const lsDel = (k) => { try { localStorage.removeItem(k); } catch (e) {} };
-    const sec = (n, title, inner, extra = '') => `<section class="nx-set-sec"><div class="nx-set-sh"><h3><b>${n}</b>${title}</h3>${extra}</div>${inner}</section>`;
-    const row = (lbl, val, hint, key, acts) => `<div class="nx-set-row"><div class="info"><div class="lbl">${lbl}</div>${val ? `<div class="val">${val}</div>` : ''}`
-      + `${hint ? `<div class="hint">${hint}</div>` : ''}${key ? `<div class="key">${key}</div>` : ''}</div><div class="acts">${acts}</div></div>`;
-    const btn = (act, label, cls = '', data = '') => `<button type="button" class="nx-set-btn ${cls}" data-set="${act}"${data}>${label}</button>`;
-    // Team name for a schedule-filter key (team_ID), from My Leagues or this page.
     const teamFor = (id) => {
       const l = myLeagues.all().find((x) => x.teamId === id);
       if (l) return mlTitle(l) + (l.sublg ? ' · ' + l.sublg : '');
       if (PAGE === 'coach' && id === pageKey && myTeam) return fullTeamName(myTeam);
       return 'Team #' + id;
     };
-
-    function paint() {
-      const leagues = myLeagues.all(), links = Object.values(coachLinks.all()).sort((a, b) => a.coach.localeCompare(b.coach)), prefs = ls();
-      const known = new Set(['nx:theme', 'nx:view', 'nx:mlIntro', 'nx:dcIntro']);
-      // Schedule filters, grouped per coach page.
-      const filt = {};
-      Object.keys(prefs).forEach((k) => {
+    const filters = () => {
+      const f = {}, p = ls();
+      Object.keys(p).forEach((k) => {
         const m = k.match(/^nx:(opp|mode|collapsed):(.*)$/);
-        if (!m) return;
-        known.add(k);
-        (filt[m[2]] = filt[m[2]] || {})[m[1]] = (() => { try { return JSON.parse(prefs[k]); } catch (e) { return null; } })();
+        if (m) (f[m[2]] = f[m[2]] || {})[m[1]] = (() => { try { return JSON.parse(p[k]); } catch (e) { return null; } })();
       });
-      const other = Object.keys(prefs).filter((k) => !known.has(k));
-      const mode = getMode(), view = store.get('view', DEFAULT_VIEW), viewObj = VERSIONS.find((v) => v.id === view);
-      const introFlag = store.get('mlIntro', null), dcFlag = store.get('dcIntro', null);
-      const coaches = [...new Set(Object.values(teamInfo).map((t) => t.coach).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      return f;
+    };
+    const otherKeys = () => Object.keys(ls()).filter((k) => !/^nx:(theme|view|mlIntro|dcIntro)$/.test(k) && !/^nx:(opp|mode|collapsed):/.test(k));
+    const replayIntro = (ml) => {
+      store.set(ml ? 'mlIntro' : 'dcIntro', false); // false = replay on the next V1 page, even if already set up
+      const app = $('.nx-root.nx-active');
+      const ready = app && (ml ? $$('.nx-ml-btn', app) : $$('.nx-dc', app)).some((x) => x.getClientRects().length);
+      if (ready) { close(); if (ml) mlIntro(app); else dcIntro(app); }
+      else say(ml ? 'It plays next time you open a V1 page.' : 'It plays next time you open a coach page in V1.');
+    };
+    const BACK = { label: 'Back', help: 'Go back.', act: back };
 
-      body.innerHTML = `<p class="nx-set-intro">Saved only in this browser. Clear one part and keep the rest.</p>`
-        + `<div class="nx-set-msg${note.err ? ' err' : ''}" role="status" aria-live="polite">${esc(note.text)}</div>`
-
-        + sec('01', 'My Leagues', row('Your coach pages',
-          leagues.length ? `${leagues.length} saved` : 'Empty',
-          leagues.length ? esc(leagues.map(mlTitle).join(' · ')) : 'Add one with ★ Add to My Leagues on a coach page.',
-          'myLeagues (Tampermonkey)', leagues.length ? btn('clear-leagues', 'Clear') : ''))
-
-        + sec('02', 'Discord DMs', (links.length
-          ? links.map((l) => row(esc(l.coach), isDmUrl(l.url) ? '' : 'Profile only: edit to add a DM link', esc(l.url.replace('https://', '')), '',
-            `<a class="nx-set-btn dc" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${DC_ICON}${isDmUrl(l.url) ? 'Chat' : 'Profile'}</a>`
-            + btn('dc-edit', 'Edit', 'alt', ` data-coach="${esc(l.coach)}"`) + btn('dc-del', 'Remove', '', ` data-coach="${esc(l.coach)}"`))).join('')
-          : '<div class="nx-set-empty">No coaches linked yet. Press <b>+</b> next to a coach name, or add one here: in your DM with them, right-click a message › <b>Copy Message Link</b>.</div>')
-          + `<form class="nx-set-form" data-set="dc-add">
-              <input class="nx-set-in coach" name="coach" list="nx-set-coaches" autocomplete="off" placeholder="Coach name" aria-label="Coach name" required>
-              <input class="nx-set-in" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a message link from your DM…" aria-label="Discord DM link" required>
-              <button type="submit" class="nx-set-btn gold">Link</button>
-              <datalist id="nx-set-coaches">${coaches.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></form>`,
-          links.length ? btn('clear-links', 'Clear all') : '')
-
-        + sec('03', 'Look', row('Colour mode', mode === 'day' ? 'Day' : 'Night', '', 'nx:theme',
-          btn('mode', 'Night', 'alt', ` data-mode="night" aria-pressed="${mode === 'night'}"`) + btn('mode', 'Day', 'alt', ` data-mode="day" aria-pressed="${mode === 'day'}"`))
-          + row('Page view', esc(viewObj ? viewObj.title : view), 'Reset goes back to the newest design.', 'nx:view',
-            btn('reset-view', 'Reset', '', view === DEFAULT_VIEW && !('nx:view' in prefs) ? ' disabled' : '')))
-
-        + sec('04', 'Tips &amp; intros', row('My Leagues intro', introFlag ? 'Seen' : 'Shows next visit',
-          'The puck that shows you how to add a team to My Leagues.', 'nx:mlIntro',
-          btn('intro', introFlag ? 'Show again' : 'Show now', 'gold', ' data-intro="ml"'))
-          + row('Discord DM intro', dcFlag ? 'Seen' : 'Shows next visit',
-            'The cursor that shows you how to link a coach to your Discord DM.', 'nx:dcIntro',
-            btn('intro', dcFlag ? 'Show again' : 'Show now', 'gold', ' data-intro="dc"')))
-
-        + sec('05', 'Schedule filters', Object.keys(filt).length
-          ? Object.entries(filt).map(([id, f]) => {
-            const bits = [];
-            if (Array.isArray(f.opp) && f.opp.length) bits.push(`${f.opp.length} coach${f.opp.length === 1 ? '' : 'es'} picked`);
-            if (f.mode && f.mode !== 'all') bits.push(f.mode === 'todo' ? 'To play only' : 'Played only');
-            if (Array.isArray(f.collapsed) && f.collapsed.length) bits.push(`${f.collapsed.length} folded`);
-            return row(esc(teamFor(id)), bits.length ? bits.join(' · ') : 'Defaults', '', `nx:opp / mode / collapsed:${esc(id)}`, btn('clear-filt', 'Clear', '', ` data-id="${esc(id)}"`));
-          }).join('')
-          : '<div class="nx-set-empty">No saved filters. Coach pills, the All / To play / Played switch and folded opponents are remembered per coach page.</div>',
-          Object.keys(filt).length > 1 ? btn('clear-filt-all', 'Clear all') : '')
-
-        + (other.length ? sec('06', 'Other', other.map((k) => row(esc(OLD_KEYS[k] || k.slice(3)), '', esc(String(prefs[k]).slice(0, 80)), esc(k), btn('clear-key', 'Clear', '', ` data-key="${esc(k)}"`))).join('')) : '')
-
-        + sec(other.length ? '07' : '06', 'Backup', row('Backup file', '', 'Leagues, Discord links and settings in one file. Restore it on another browser or computer.', '',
-          btn('export', '⬇ Download', 'gold') + btn('import', '⬆ Restore…', 'alt'))
-          + (pending ? `<div class="nx-set-confirm"><b>Backup from ${esc(pending.exportedAt ? new Date(pending.exportedAt).toLocaleString() : 'an unknown date')}</b><br>
-            ${pending.leagues.length} league(s), ${pending.coachLinks ? Object.keys(pending.coachLinks).length : 'no'} Discord link(s), ${Object.keys(pending.prefs).length} setting(s).
-            Restoring <b>replaces</b> what's saved now.<div class="acts">${btn('restore-yes', 'Restore', 'gold')}${btn('restore-no', 'Cancel', 'alt')}</div></div>` : ''));
+    // Each page: { title, text?, field?, items: [{ label, val, sub, help, act, confirm, cycle, off }] }
+    function page(p) {
+      const leagues = myLeagues.all(), links = Object.values(coachLinks.all()).sort((a, b) => a.coach.localeCompare(b.coach));
+      switch (p.id) {
+        case 'root': {
+          const nf = Object.keys(filters()).length, other = otherKeys().length;
+          return { title: 'Settings', items: [
+            { label: 'My Leagues', val: leagues.length ? `${leagues.length} saved` : '', sub: true, help: 'Your coach pages, one per league. Saved as myLeagues (Tampermonkey).', act: () => go('leagues') },
+            { label: 'Discord DMs', val: links.length ? `${links.length} linked` : '', sub: true, help: 'Coaches you can DM in one click. Saved as coachLinks (Tampermonkey).', act: () => go('dms') },
+            { label: 'Look', val: cap(getMode()), sub: true, help: 'Day or Night, and which page design to show.', act: () => go('look') },
+            { label: 'Tips & Intros', sub: true, help: 'Replay the My Leagues and Discord DM walkthroughs.', act: () => go('intros') },
+            { label: 'Schedule Filters', val: nf ? `${nf} page${nf === 1 ? '' : 's'}` : '', sub: true, help: 'Coach picks, tabs and folded opponents, remembered per coach page.', act: () => go('filters') },
+            ...(other ? [{ label: 'Other Saved Bits', val: String(other), sub: true, help: 'Leftovers from older versions.', act: () => go('other') }] : []),
+            { label: 'Backup & Restore', sub: true, help: 'Save everything to one file, or load it on another browser.', act: () => go('backup') },
+            { label: 'Reset Everything', confirm: true, help: 'Clears My Leagues, Discord links and every setting, then reloads.', act: () => { resetAll(); location.reload(); } },
+            { label: 'Close', help: 'Back to the page. (Esc)', act: close },
+          ] };
+        }
+        case 'leagues': return { title: 'My Leagues', items: [
+          ...(leagues.length ? leagues.map((x) => ({ label: mlTitle(x), val: x.sublg, help: `${mlSub(x)} · Enter opens it.`, act: () => { location.href = x.path; } }))
+            : [{ label: 'No leagues saved yet', off: true, help: 'Press ★ Add to My Leagues on one of your coach pages.' }]),
+          ...(leagues.length ? [{ label: 'Clear My Leagues', confirm: true, help: `Removes all ${leagues.length} saved league(s).`, act: () => { myLeagues.save([]); say('My Leagues cleared.'); } }] : []),
+          BACK,
+        ] };
+        case 'dms': return { title: 'Discord DMs', items: [
+          { label: 'Link a Coach', sub: true, help: 'Pick a coach, then paste a message link from your DM with them.', act: () => go('dcPick') },
+          ...links.map((l) => ({ label: l.coach, val: isDmUrl(l.url) ? 'Chat' : 'Profile', sub: true,
+            help: isDmUrl(l.url) ? 'Opens your DM. Enter for options.' : 'Profile link only: change it to a DM link.', act: () => go('dcCoach', { coach: l.coach }) })),
+          ...(links.length ? [{ label: 'Clear All Links', confirm: true, help: `Removes all ${links.length} Discord link(s).`, act: () => { coachLinks.save({}); say('Discord links cleared.'); } }] : []),
+          BACK,
+        ] };
+        case 'dcPick': {
+          const coaches = [...new Set(Object.values(teamInfo).map((t) => t.coach).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+          return { title: 'Link a Coach', items: [
+            ...coaches.map((c) => ({ label: c, val: coachLinks.get(c) ? 'Linked' : '', sub: true, help: `Link ${c}'s Discord DM.`, act: () => go('dcInput', { coach: c }) })),
+            { label: 'Type a Name', sub: true, help: 'For a coach who is not in this league.', act: () => go('dcName') },
+            BACK,
+          ] };
+        }
+        case 'dcName': return { title: 'Coach Name', field: { ph: 'Coach name', label: 'Coach name' },
+          text: ['Type the coach name exactly as the site shows it.'],
+          items: [{ label: 'Next', help: 'Then paste their Discord link.', act: () => submit() }, BACK] };
+        case 'dcCoach': {
+          const l = coachLinks.get(p.coach);
+          if (!l) return { title: p.coach, items: [{ label: 'Not linked', off: true }, BACK] };
+          return { title: p.coach, items: [
+            { label: isDmUrl(l.url) ? 'Open DM' : 'Open Profile', help: l.url.replace('https://', ''), act: () => window.open(l.url, '_blank', 'noopener') },
+            { label: 'Change Link', sub: true, help: 'Paste a new message link from your DM.', act: () => go('dcInput', { coach: p.coach }) },
+            { label: 'Remove Link', confirm: true, help: `Forget ${p.coach}'s Discord link.`, act: () => { coachLinks.remove(p.coach); back(); say('Link removed.'); } },
+            BACK,
+          ] };
+        }
+        case 'dcInput': {
+          const cur = coachLinks.get(p.coach);
+          return { title: 'Link Discord', field: { ph: 'Paste a message link from your DM…', label: `Discord DM link for ${p.coach}`, value: cur ? cur.url : '' },
+            text: [`Coach: <b>${esc(p.coach)}</b>`, '1. In Discord, open your DM with them (message them once if you never have).',
+              '2. Right-click any message and pick <b>Copy Message Link</b>.', '3. Paste it here and press Enter.'],
+            items: [
+              { label: 'Save', help: 'The button turns into CHAT. One click opens your DM.', act: () => submit() },
+              ...(cur ? [{ label: 'Remove Link', confirm: true, help: `Forget ${p.coach}'s Discord link.`, act: () => { coachLinks.remove(p.coach); back(); } }] : []),
+              { label: p.only ? 'Cancel' : 'Back', help: 'Leave without saving.', act: back },
+            ] };
+        }
+        case 'look': {
+          const views = VERSIONS, vi = Math.max(0, views.findIndex((v) => v.id === store.get('view', DEFAULT_VIEW)));
+          const flip = () => { setMode(getMode() === 'day' ? 'night' : 'day'); paint(); };
+          const turn = (d) => { setView(views[(vi + d + views.length) % views.length].id); paint(); };
+          return { title: 'Look', items: [
+            { label: 'Colour Mode', val: cap(getMode()), help: '← → or Enter switches Day / Night. Saved as nx:theme.', act: flip, cycle: flip },
+            { label: 'Page View', val: views[vi].title, help: '← → or Enter picks the page design. Saved as nx:view.', act: () => turn(1), cycle: turn },
+            BACK,
+          ] };
+        }
+        case 'intros': {
+          const ml = store.get('mlIntro', null), dc = store.get('dcIntro', null);
+          return { title: 'Tips & Intros', items: [
+            { label: 'My Leagues Intro', val: ml ? 'Seen' : 'Next visit', help: 'The puck that shows how to add a team to My Leagues. Enter plays it. Saved as nx:mlIntro.', act: () => replayIntro(true) },
+            { label: 'Discord DM Intro', val: dc ? 'Seen' : 'Next visit', help: 'The cursor that shows how to link a coach\'s DM. Enter plays it. Saved as nx:dcIntro.', act: () => replayIntro(false) },
+            BACK,
+          ] };
+        }
+        case 'filters': {
+          const f = Object.entries(filters());
+          return { title: 'Schedule Filters', items: [
+            ...(f.length ? f.map(([id, x]) => {
+              const bits = [];
+              if (Array.isArray(x.opp) && x.opp.length) bits.push(`${x.opp.length} coach${x.opp.length === 1 ? '' : 'es'}`);
+              if (x.mode && x.mode !== 'all') bits.push(x.mode === 'todo' ? 'To play' : 'Played');
+              if (Array.isArray(x.collapsed) && x.collapsed.length) bits.push(`${x.collapsed.length} folded`);
+              return { label: teamFor(id), val: bits.join(', ') || 'Defaults', confirm: true, help: `Enter clears this page's filters. Saved as nx:opp/mode/collapsed:${id}.`,
+                act: () => { ['opp', 'mode', 'collapsed'].forEach((k) => lsDel(`nx:${k}:${id}`)); say('Cleared. Reload the page to see it.'); } };
+            }) : [{ label: 'No saved filters', off: true, help: 'Coach picks, tabs and folded opponents are remembered per coach page.' }]),
+            ...(f.length > 1 ? [{ label: 'Clear All Filters', confirm: true, help: 'Clears the filters on every coach page.', act: () => { Object.keys(ls()).filter((k) => /^nx:(opp|mode|collapsed):/.test(k)).forEach(lsDel); say('All filters cleared. Reload to see it.'); } }] : []),
+            BACK,
+          ] };
+        }
+        case 'other': return { title: 'Other Saved Bits', items: [
+          ...otherKeys().map((k) => ({ label: OLD_KEYS[k] || k.slice(3), val: String(ls()[k]).slice(0, 30), confirm: true, help: `Enter clears it. Saved as ${k}.`, act: () => { lsDel(k); say('Cleared.'); } })),
+          BACK,
+        ] };
+        case 'backup': return { title: 'Backup & Restore', items: [
+          { label: 'Download Backup', help: 'Leagues, Discord links and settings in one file.', act: () => { downloadBackup(); say('Backup downloaded. Keep it somewhere safe.'); } },
+          { label: 'Restore from File', sub: true, help: 'Load a backup file. You get to check it first.', act: () => fileIn.click() },
+          BACK,
+        ] };
+        case 'restore': {
+          const b = p.pending;
+          return { title: 'Restore Backup', text: [`From <b>${esc(b.exportedAt ? new Date(b.exportedAt).toLocaleString() : 'an unknown date')}</b>:`,
+            `${b.leagues.length} league(s), ${b.coachLinks ? Object.keys(b.coachLinks).length : 'no'} Discord link(s), ${Object.keys(b.prefs).length} setting(s).`],
+          items: [
+            { label: 'Restore', confirm: true, help: 'Replaces what is saved now, then reloads.', act: () => { applyBackup(b); location.reload(); } },
+            { label: 'Cancel', help: 'Keep what you have.', act: back },
+          ] };
+        }
+        default: return { title: '', items: [BACK] };
+      }
     }
 
-    w.el.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const f = e.target;
-      if (f.dataset.set !== 'dc-add') return;
-      const coach = norm(f.coach.value);
-      const err = coachLinks.set(coach, f.url.value);
-      if (err) return say(err, true);
-      say(`Linked ${coach}!`);
-    });
-    w.el.addEventListener('click', (e) => {
-      const b = e.target.closest('button[data-set]');
-      if (!b) return;
-      const act = b.dataset.set;
-      if (act === 'clear-leagues' && armed(b)) { myLeagues.save([]); say('My Leagues cleared.'); }
-      else if (act === 'clear-links' && armed(b)) { coachLinks.save({}); say('Discord links cleared.'); }
-      else if (act === 'dc-del' && armed(b)) { coachLinks.remove(b.dataset.coach); say(`Removed ${b.dataset.coach}.`); }
-      else if (act === 'dc-edit') openDcDialog(b.dataset.coach, b);
-      else if (act === 'mode') { setMode(b.dataset.mode); paint(); }
-      else if (act === 'reset-view') { lsDel('nx:view'); setView(DEFAULT_VIEW); say('View reset.'); }
-      else if (act === 'intro') {
-        const ml = b.dataset.intro === 'ml', app = $('.nx-root.nx-active');
-        store.set(ml ? 'mlIntro' : 'dcIntro', false); // false = replay on the next V1 page, even if already set up
-        const ready = app && (ml ? $$('.nx-ml-btn', app) : $$('.nx-dc', app)).some((el) => el.getClientRects().length);
-        if (ready) { w.close(); if (ml) mlIntro(app); else dcIntro(app); }
-        else say(ml ? 'The intro shows next time you open a V1 page.' : 'The intro shows next time you open a coach page in V1.');
+    function submit() {
+      const p = top(), input = $('.nx-rg-field input', inner), v = input ? input.value : '';
+      if (p.id === 'dcName') {
+        if (!norm(v)) return say('Type the coach name first.', true);
+        stack.pop(); return go('dcInput', { coach: norm(v) });
       }
-      else if (act === 'clear-filt' && armed(b)) { ['opp', 'mode', 'collapsed'].forEach((p) => lsDel(`nx:${p}:${b.dataset.id}`)); say('Filters cleared. Reload to see it.'); }
-      else if (act === 'clear-filt-all' && armed(b)) { Object.keys(ls()).filter((k) => /^nx:(opp|mode|collapsed):/.test(k)).forEach(lsDel); say('All filters cleared. Reload to see it.'); }
-      else if (act === 'clear-key' && armed(b)) { lsDel(b.dataset.key); say('Cleared.'); }
-      else if (act === 'export') { downloadBackup(); say('Backup downloaded! Keep it safe.'); }
-      else if (act === 'import') fileIn.click();
-      else if (act === 'restore-no') { pending = null; paint(); }
-      else if (act === 'restore-yes' && pending) { applyBackup(pending); pending = null; say('Restored! Reloading…'); setTimeout(() => location.reload(), 800); }
-      else if (act === 'reset-all' && armed(b)) { resetAll(); location.reload(); }
+      const err = coachLinks.set(p.coach, v);
+      if (err) return say(err, true);
+      if (p.only) return close();
+      back(); say(`Linked ${p.coach}!`);
+    }
+
+    function activate(i) {
+      const it = items[i];
+      if (!it || it.off || !it.act) return;
+      const key = top().id + ':' + i;
+      if (it.confirm && armedAt !== key) {
+        armedAt = key; clearTimeout(armTimer);
+        armTimer = setTimeout(() => { armedAt = ''; paint(); }, 3000);
+        return paint();
+      }
+      armedAt = '';
+      it.act();
+    }
+    function move(d) {
+      const p = top(), n = items.length;
+      for (let k = 1; k <= n; k++) { const j = (p.sel + d * k + n * 2) % n; if (!items[j].off) { p.sel = j; break; } }
+      armedAt = ''; paint();
+    }
+
+    function paint() {
+      if (!el.isConnected) return;
+      const p = top(), pg = page(p);
+      items = pg.items;
+      if (p.sel >= items.length) p.sel = items.length - 1;
+      if (items[p.sel] && items[p.sel].off) p.sel = Math.max(0, items.findIndex((x) => !x.off));
+      const old = $('.nx-rg-field input', inner), keepVal = old && old.dataset.page === stack.length + p.id ? old.value : null;
+      const help = flash.text ? flash.text : (items[p.sel] || {}).help || '';
+      const t = new Date(), clock = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+      inner.innerHTML = `<div class="nx-rg-head"><button type="button" class="nx-rg-back" data-rg="back">${stack.length > 1 && !p.only ? '‹ Back' : '✕ Close'}</button>
+          <h2 id="nx-rg-title">${esc(pg.title)}</h2><span class="nx-rg-ver">v${esc(SCRIPT_VERSION)}</span></div>
+        <div class="nx-rg-list" role="menu" aria-label="${esc(pg.title)}">
+          ${(pg.text || []).map((x) => `<p class="nx-rg-text">${x}</p>`).join('')}
+          ${pg.field ? `<label class="nx-rg-field"><input type="text" autocomplete="off" spellcheck="false" data-page="${stack.length + p.id}"
+            aria-label="${esc(pg.field.label)}" placeholder="${esc(pg.field.ph)}" value="${esc(keepVal != null ? keepVal : pg.field.value || '')}"></label>` : ''}
+          ${items.map((it, i) => `<div class="nx-rg-row${i === p.sel ? ' sel' : ''}${it.off ? ' off' : ''}${armedAt === p.id + ':' + i ? ' armed' : ''}" role="menuitem" data-i="${i}"${it.off ? ' aria-disabled="true"' : ''}>
+            <span class="l">${esc(it.label)}</span>${armedAt === p.id + ':' + i ? '<span class="v">Press again</span>'
+              : it.val ? `<span class="v">${esc(it.val)}</span>` : it.sub ? '<span class="v dots">...</span>' : ''}</div>`).join('')}
+        </div>
+        <div class="nx-rg-foot"><span class="help${flash.err ? ' err' : ''}" role="status" aria-live="polite">${esc(help)}</span><span class="clock">${clock}</span></div>`;
+      const row = $('.nx-rg-row.sel', inner);
+      if (row) row.scrollIntoView({ block: 'nearest' });
+      const input = $('.nx-rg-field input', inner);
+      if (input && document.activeElement !== input) {
+        input.focus();
+        if (keepVal == null) input.select(); else input.setSelectionRange(input.value.length, input.value.length);
+      }
+      else if (!input && !box.contains(document.activeElement)) box.focus();
+    }
+
+    inner.addEventListener('mousemove', (e) => {
+      const r = e.target.closest('.nx-rg-row');
+      if (!r || r.classList.contains('off') || +r.dataset.i === top().sel) return;
+      top().sel = +r.dataset.i;
+      if (!armedAt) { $$('.nx-rg-row', inner).forEach((x) => x.classList.toggle('sel', x === r)); const h = $('.nx-rg-foot .help', inner); if (h && !flash.text) h.textContent = items[top().sel].help || ''; }
+      else { armedAt = ''; paint(); }
     });
+    inner.addEventListener('click', (e) => {
+      if (e.target.closest('[data-rg="back"]')) return back();
+      const r = e.target.closest('.nx-rg-row');
+      if (r) { top().sel = +r.dataset.i; activate(+r.dataset.i); }
+    });
+    el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
+    const onKey = (e) => {
+      if ($$('.nx-set').pop() !== el) return;
+      const inInput = e.target.matches && e.target.matches('.nx-rg-field input');
+      const it = items[top().sel] || {};
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); return back(); }
+      if (inInput) { if (e.key === 'Enter') { e.preventDefault(); submit(); } else if (e.key === 'ArrowDown') { e.preventDefault(); box.focus(); } return; }
+      const k = e.key;
+      if (k === 'ArrowDown' || k === 'ArrowUp') { e.preventDefault(); move(k === 'ArrowDown' ? 1 : -1); }
+      else if (k === 'Home' || k === 'End') {
+        e.preventDefault();
+        const on = items.map((x, i) => (x.off ? -1 : i)).filter((i) => i >= 0);
+        top().sel = k === 'Home' ? on[0] : on[on.length - 1]; armedAt = ''; paint();
+      }
+      else if (k === 'ArrowRight' && it.cycle) { e.preventDefault(); it.cycle(1); }
+      else if (k === 'ArrowLeft' && it.cycle) { e.preventDefault(); it.cycle(-1); }
+      else if (k === 'Enter' || k === ' ' || k === 'ArrowRight') { e.preventDefault(); activate(top().sel); }
+      else if (k === 'ArrowLeft' || k === 'Backspace') { e.preventDefault(); back(); }
+      else if (k === 'Tab') { e.preventDefault(); const f = $$('.nx-rg-field input, .nx-rg-back', inner); const i = f.indexOf(document.activeElement); (f[(i + 1) % f.length] || box).focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
     fileIn.addEventListener('change', async () => {
       const f = fileIn.files && fileIn.files[0];
       fileIn.value = '';
       if (!f) return;
-      try { pending = readBackup(await f.text()); say(''); } catch (err) { pending = null; say(err.message, true); }
+      try { go('restore', { pending: readBackup(await f.text()) }); } catch (err) { say(err.message, true); }
     });
-    // Keep the screen current while open (e.g. a link saved from the small window).
-    const repaint = () => paint();
+    const repaint = () => paint(), clockTimer = setInterval(repaint, 30000);
     ['nx:myleagues', 'nx:coachlinks'].forEach((ev) => document.addEventListener(ev, repaint));
-    w.el.addEventListener('nx:closed', () => ['nx:myleagues', 'nx:coachlinks'].forEach((ev) => document.removeEventListener(ev, repaint)));
+    function close() {
+      if (!el.isConnected) return;
+      el.remove();
+      clearInterval(clockTimer); clearTimeout(armTimer); clearTimeout(flashTimer);
+      document.removeEventListener('keydown', onKey, true);
+      ['nx:myleagues', 'nx:coachlinks'].forEach((ev) => document.removeEventListener(ev, repaint));
+      if (opener && opener.isConnected) { opener.removeAttribute('aria-expanded'); opener.focus(); }
+    }
     paint();
-    $('.nx-set-x', w.el).focus();
+    if (!$('.nx-rg-field input', inner)) box.focus();
+    // The menu grows out of the button that opened it, in chunky steps.
+    if (opener && !reducedMotion()) {
+      const o = opener.getBoundingClientRect(), b = box.getBoundingClientRect();
+      if (o.width) {
+        box.style.transformOrigin = `${o.left + o.width / 2 - b.left}px ${o.top + o.height / 2 - b.top}px`;
+        box.animate([{ transform: 'scale(.03)', opacity: 0.4 }, { transform: 'scale(1)', opacity: 1 }], { duration: 280, easing: 'steps(7, end)' });
+      }
+    }
   }
 
   // ============================================================
@@ -2403,7 +2466,7 @@
     '<span class="nx-sw-mode" role="group" aria-label="Colour mode">' +
     '<button type="button" data-mode="day" title="Day mode" aria-label="Day mode">☀</button>' +
     '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>' +
-    '<button type="button" class="nx-sw-gear" data-settings title="Settings: everything this script saves" aria-label="Settings">⚙</button>' +
+    `<button type="button" class="nx-sw-gear" data-settings title="Settings" aria-label="Settings" aria-haspopup="dialog">${GEAR_SVG}</button>` +
     `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION} · ${CHANNEL} channel">v${SCRIPT_VERSION}` +
     (CHANNEL === 'stable' ? '' : `<span class="nx-sw-chan">${CHANNEL.toUpperCase()}</span>`) + '</span>';
   document.body.appendChild(sw);
