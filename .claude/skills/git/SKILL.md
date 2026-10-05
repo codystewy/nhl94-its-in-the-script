@@ -6,7 +6,7 @@ argument-hint: "push | summary | release | hotfix <commit> | fun remove <id>"
 
 # /git: push, release, hotfix
 
-The repo is `codystewy/nhl94-its-in-the-script`. The shipped file is `nhl94-its-in-the-script.user.js`. Versions are SemVer `1.MINOR.PATCH`, tagged `vX.Y.Z`.
+The repo is `codystewy/nhl94-its-in-the-script`. The shipped file is `nhl94-its-in-the-script.user.js`. Versions are SemVer `MAJOR.MINOR.PATCH`, tagged `vX.Y.Z`.
 
 ## Channels (how shipping works)
 

@@ -30,11 +30,12 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 ## What's new
 
-**v1.4.1:** the big one.
-- 🌙 **Lights out.** Day and Night mode on every page. Night is the default, because hockey is better after dark.
-- 👕 **Every team wears its own jersey.** All 26 team pages come in their real 1993-94 colors.
-- ★ **My Leagues.** Bouncing between leagues? Save your teams once and hop between them from anywhere. Back them up, restore them, or wipe the slate clean.
-- 🏒 **Fixed:** the Rangers were hiding in the standings under a fake name ("New York"). We found them.
+**v2.0.0:** the "game tonight?" update.
+- 💬 **DM any coach.** Link a coach's Discord once, then **CHAT** opens your DM in one click.
+- ⚙ **Settings, RetroArch style.** Arrow keys, Enter, Esc, just like your emulator. Everything stays in your own browser.
+- 🔎 **Find any league fast.** The league bar sits right under the menu, and you can search all ~286 seasons. Yours wear a ★.
+- 🎯 **Filter by Coach.** One dropdown with logos, coach names and DM buttons.
+- 🔀 **One switch** turns the new look on or off. Day and Night live in Settings now.
 
 See the full [changelog](CHANGELOG.md) for everything else.
 

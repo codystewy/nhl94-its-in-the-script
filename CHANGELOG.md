@@ -1,7 +1,21 @@
 # Changelog
 
 Every release of **NHL94 – It's In The Script**, newest first, in plain English.
-Version numbers follow [Semantic Versioning](https://semver.org): **1.MINOR.PATCH**. MINOR goes up for new stuff, PATCH for fixes and polish.
+Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.PATCH**. MAJOR goes up for big shake-ups, MINOR for new stuff, PATCH for fixes and polish.
+
+## [2.0.0] – 2026-10-05
+
+### ✨ New
+- **💬 DM any coach on Discord.** Press **+ DM** next to a coach, paste a message link from your DM with them, and the button turns into **CHAT**. One click and you're asking "game tonight?" A quick walkthrough shows you how the first time. Your links are yours alone, so they won't open anything for someone you share them with.
+- **⚙ Settings, RetroArch style.** The gear in the corner opens a menu that looks just like your emulator's: arrow keys, Enter, Esc. See everything the script remembers, clear one thing at a time, flip Day and Night, replay the intros, and back up or restore it all. It all stays in your own browser.
+- **Filter by Coach.** The row of coach pills is now one big dropdown with each coach's logo, name and DM button. Pick one coach or a whole line.
+- **League bar up top.** Season and level pickers sit right under the menu, where the original site trained you to look. Type to search all ~286 seasons, and your own leagues wear a ★.
+- **One switch for the new look.** The corner is now just an on/off switch (new look or the original site) and the gear.
+- **Pick your channel.** Install Stable for tested releases, Latest for every change the moment it lands, or Fun for the playful extras. Settings shows which one you're on.
+- **My Leagues speaks up.** Brighter buttons, and a one-time slap shot shows newcomers where their teams live. The **?** badge replays it.
+
+### 🐛 Fixed
+- Coach names and gold touches were squinting at you in Day mode (Calgary's gold was the worst offender). They're easy to read now.
 
 ## [1.4.1] – 2026-10-04
 
@@ -45,5 +59,6 @@ Version numbers follow [Semantic Versioning](https://semver.org): **1.MINOR.PATC
 - **The coach page, redesigned.** Coach names next to every team, the schedule grouped by opponent, filters that remember you, and a checkpoint countdown.
 - A **Classic / V1** switch so the original site is always one click away.
 
+[2.0.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.4.1...v2.0.0
 [1.4.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.1.2...v1.4.1
 [1.1.2]: https://github.com/codystewy/nhl94-its-in-the-script/releases/tag/v1.1.2
