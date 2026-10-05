@@ -1,6 +1,6 @@
 # NHL94 – It's In The Script 🏒
 
-A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.com) page by page. The look mixes NHL 26 with 16-bit, and it fixes the thing that started this project: **the schedule never told you who coaches each team.**
+A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.com) page by page. The look mixes NHL 26 with 16-bit.
 
 ![V1 home page](docs/screenshots/home-v1.png)
 
