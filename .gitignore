@@ -3,4 +3,4 @@ dev/out/
 dev/local-loader.user.js
 *.backup.txt
 bakup.js
-screenshots/
+/screenshots/
