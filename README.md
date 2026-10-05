@@ -2,6 +2,22 @@
 
 A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.com) page by page. The look mixes NHL 26 with 16-bit, and it fixes the thing that started this project: **the schedule never told you who coaches each team.**
 
+![V1 home page](docs/screenshots/home-v1.png)
+
+## Before & after
+
+| Classic (original site) | V1 · Rink Night |
+| --- | --- |
+| ![Original home page](docs/screenshots/home-classic.png) | ![V1 home page](docs/screenshots/home-v1.png) |
+| ![Original coach page](docs/screenshots/coach-classic.png) | ![V1 coach page](docs/screenshots/coach-v1-final.png)<br><sub>Coach page with the Final filter on: grouped by opponent, with coach names, results and OT tags</sub> |
+
+<details>
+<summary><b>Phone view</b></summary>
+
+<img src="docs/screenshots/coach-v1-mobile.png" alt="V1 coach page on a phone" width="320">
+
+</details>
+
 ## Install (one click)
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) for your browser.

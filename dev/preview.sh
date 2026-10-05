@@ -4,6 +4,7 @@
 #   team_ID  a coach page team_ID (default 6714 = Calgary, SNES-CD, Classic '94-2026 Fall), or "home"
 #            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
+#   EXTRA_JS='...' runs before the script (e.g. preset filters: localStorage.setItem("nx:mode:", '"done"'))
 #   MYTEAM='{"href":"...","team":"Calgary","coach":"Stewy","level":"SNES-CD"}' pre-pins a team
 # Output: dev/out/preview-<team_ID>-<view>.png
 set -euo pipefail
@@ -36,6 +37,8 @@ s = s.replace('charset=iso-8859-1', 'charset=utf-8').replace('<head>', f'<head><
 pre = f'window.__nxTestPath={json.dumps(tpath)};localStorage.clear();' + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
 if myteam:
     pre += f'localStorage.setItem("nx:myteam",{json.dumps(myteam)});'
+import os
+pre += os.environ.get('EXTRA_JS', '')
 s = s.replace('</body>', '<script>' + pre + 'window.addEventListener("load",()=>{try{' + js +
               '}catch(e){document.title="SCRIPT ERROR: "+e.message}});</script></body>')
 open(out, 'w', encoding='utf-8').write(s)

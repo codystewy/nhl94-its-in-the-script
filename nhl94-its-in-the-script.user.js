@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.1.0
+// @version      1.1.1
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -317,7 +317,7 @@
     /* ---------- Layout ---------- */
     .nx-main { max-width: 1320px; margin: 0 auto; padding: 22px 24px 60px; }
     .nx-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; margin-top: 22px; }
-    @media (max-width: 1100px) { .nx-grid { grid-template-columns: 1fr; } .nx-league { display: none; } }
+    @media (max-width: 1100px) { .nx-grid { grid-template-columns: minmax(0, 1fr); } .nx-league { display: none; } }
     @media (max-width: 1280px) { .nx-nav > div > a { padding: 0 7px; font-size: 13px; letter-spacing: .3px; } .nx-top { gap: 14px; padding: 0 16px; } }
     @media (max-width: 760px) { .nx-nav { display: none; } .nx-main { padding: 14px; } }
 
@@ -344,7 +344,18 @@
     .nx-hero-rank .big { font-family: var(--nx-px); font-size: 24px; color: #fff; text-shadow: 3px 3px 0 var(--nx-red-d); }
     .nx-hero-rank .lab { font-family: var(--nx-cond); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--nx-gold); margin-top: 8px; }
     @media (max-width: 900px) { .nx-hero-rank { margin-right: 0; } .nx-hero-in::after { display: none; } }
-    @media (max-width: 640px) { .nx-hero-in { flex-wrap: wrap; padding: 18px; } .nx-hero-logo { width: 88px; height: 88px; } .nx-hero-logo img { width: 70px; height: 70px; } }
+    @media (max-width: 640px) {
+      .nx-hero-in { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
+      .nx-hero-txt { width: 100%; }
+      .nx-hero-rank { align-self: stretch; margin: 0; }
+      .nx-hero-logo { width: 88px; height: 88px; } .nx-hero-logo img { width: 70px; height: 70px; }
+      .nx-statbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .nx-stat { border-bottom: 1px solid rgba(255,255,255,.07); }
+      table.nx-sched td, table.nx-sched th { padding-left: 6px; padding-right: 6px; }
+      table.nx-sched td.tm { white-space: normal; font-size: 11px; }
+      .nx-go { min-width: 0; }
+      .nx-cp-bar { min-width: 100%; order: 5; }
+    }
 
     .nx-statbar { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
       background: rgba(0,0,0,.5); border-top: 1px solid rgba(255,255,255,.1); }
@@ -1003,6 +1014,11 @@
     }
     Object.entries(rendered).forEach(([k, el]) => el && el.classList.toggle('nx-active', k === id));
     document.body.setAttribute('data-nx-view', id);
+    let vp = document.querySelector('meta[name="viewport"][data-nx]');
+    if (id !== 'classic' && !vp && !document.querySelector('meta[name="viewport"]')) {
+      vp = document.createElement('meta'); vp.name = 'viewport'; vp.content = 'width=device-width, initial-scale=1'; vp.dataset.nx = '1';
+      document.head.appendChild(vp);
+    } else if (id === 'classic' && vp) vp.remove();
     $$('button', sw).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === id)));
     store.set('view', id);
   }
