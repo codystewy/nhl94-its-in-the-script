@@ -1,8 +1,20 @@
 # NHL94 – It's In The Script 🏒
 
+> *It started with just wanting a dark and night mode. Then things got a little out of hand.* 🌙
+
 A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.com) page by page. The look mixes NHL 26 with 16-bit.
 
 ![V1 home page](docs/screenshots/home-v1.png)
+
+## What's new
+
+**v1.4.1:** the big one.
+- 🌙 **Lights out.** Day and Night mode on every page. Night is the default, because hockey is better after dark.
+- 👕 **Every team wears its own jersey.** All 26 team pages come in their real 1993-94 colors.
+- ★ **My Leagues.** Bouncing between leagues? Save your teams once and hop between them from anywhere. Back them up, restore them, or wipe the slate clean.
+- 🏒 **Fixed:** the Rangers were hiding in the standings under a fake name ("New York"). We found them.
+
+See the full [changelog](CHANGELOG.md) for everything else.
 
 ## Before & after
 
