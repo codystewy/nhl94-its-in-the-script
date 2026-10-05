@@ -1,0 +1,67 @@
+# Builds the Latest and Fun channel files on every push to main and publishes each
+# to its own branch, which is what Tampermonkey installs and auto-updates from.
+# Stable is not built here: /git release pushes the release commit to the stable branch.
+name: channels
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: channels
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build and publish channels
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          SHA=$(git rev-parse --short HEAD)
+          for CH in latest fun; do
+            OUT="$RUNNER_TEMP/$CH"
+            mkdir -p "$OUT"
+            dev/build-channel.sh "$CH" "$OUT"
+            FILE="$OUT/nhl94-its-in-the-script.$CH.user.js"
+            VER=$(grep -m1 '^// @version' "$FILE" | awk '{print $3}')
+            WT="$RUNNER_TEMP/wt-$CH"
+            if git ls-remote --exit-code --heads origin "$CH" >/dev/null; then
+              git fetch -q origin "$CH"
+              git worktree add -q "$WT" "origin/$CH"
+              git -C "$WT" checkout -q -B "$CH"
+            else
+              git worktree add -q --detach "$WT"
+              git -C "$WT" checkout -q --orphan "$CH"
+              git -C "$WT" rm -rfq .
+            fi
+            cp "$FILE" "$WT/"
+            cat > "$WT/README.md" <<MD
+          # NHL94 – It's In The Script ($CH channel)
+
+          Built automatically from \`main\` on every push. Don't edit this branch.
+
+          [Install the $CH channel](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/$CH/nhl94-its-in-the-script.$CH.user.js) · [All channels](https://github.com/codystewy/nhl94-its-in-the-script#install-pick-your-channel)
+          MD
+            git -C "$WT" add -A
+            if git -C "$WT" diff --cached --quiet; then
+              echo "$CH: no changes"
+            else
+              git -C "$WT" commit -qm "$CH v$VER (from $SHA)"
+              git -C "$WT" push -q origin "$CH"
+              echo "$CH: published v$VER"
+            fi
+          done
