@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Fun)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      2.1.0.46
+// @version      2.1.0.49
 // @description  Redesigns nhl94online.com (home, coach, standings, stats, records and box score pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '2.1.0.46';
+  const SCRIPT_VERSION = '2.1.0.49';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'fun';
   const FUN = CHANNEL === 'fun';
@@ -755,6 +755,7 @@
     return `<div class="nx-lgbar" role="group" aria-label="League selection">
       ${leagueOpts.length ? picker('lg', 'LEAGUE', [...leagueOpts].reverse().map((o) => ({ ...o, mine: mine.has(o.v) })), curLg, true) : ''}
       ${levelOpts.length ? picker('lv', 'LEVEL', levelOpts, curLv, false) : ''}
+      ${PAGE === 'coach' && lgLinkKey(currentLg(), curSublg()) ? (setSetup(), `<div class="nx-lgbar-f dc"><span class="nx-lgdc-slot">${lgdcInner()}</span></div>`) : ''}
     </div>`;
   }
 
@@ -914,6 +915,47 @@
     },
     remove(coach) { const m = this.all(); delete m[coachKey(coach)]; this.save(m); },
   };
+  // League → its Discord server, one per season + level (lg + sublg in the URL).
+  // Takes an invite (discord.gg/<code>, discord.com/invite/<code>) or a server channel link
+  // (discord.com/channels/<server>/<channel>, a message link is trimmed to the channel).
+  // Saved next to My Leagues (GM storage) as { 'lg:sublg': { lg, sublg, url, addedAt } }.
+  function parseServerUrl(url) {
+    try {
+      const raw = String(url || '').trim(), u = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+      const host = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (host === 'discord.gg') { const m = u.pathname.match(/^\/([\w-]{2,32})\/?$/); return m ? 'https://discord.gg/' + m[1] : ''; }
+      if (!/^(canary\.|ptb\.)?discord(app)?\.com$/.test(host)) return '';
+      const inv = u.pathname.match(/^\/invite\/([\w-]{2,32})\/?$/);
+      if (inv) return 'https://discord.gg/' + inv[1];
+      const ch = u.pathname.match(/^\/channels\/(\d{15,21})(\/\d{15,21})?(\/\d{15,21})?\/?$/);
+      return ch ? `https://discord.com/channels/${ch[1]}${ch[2] || ''}` : '';
+    } catch (e) { return ''; }
+  }
+  const curSublg = () => params.get('sublg') || (levelOpts.find((o) => o.sel) || {}).v || '';
+  const lgLinkKey = (lg, sublg) => (lg && sublg ? lg + ':' + sublg : '');
+  function cleanLgLinks(raw) {
+    const out = {};
+    if (raw && typeof raw === 'object') Object.values(raw).forEach((x) => {
+      const url = x && parseServerUrl(x.url), lg = x && str(x.lg, 12), sublg = x && str(x.sublg, 40);
+      if (url && /^\d+$/.test(lg) && sublg) out[lgLinkKey(lg, sublg)] = { lg, sublg, league: str(x.league), url, addedAt: +x.addedAt || Date.now() };
+    });
+    return out;
+  }
+  const leagueLinks = {
+    all() { return cleanLgLinks(gmStore.get('leagueLinks', {})); },
+    get(lg, sublg) { return this.all()[lgLinkKey(lg, sublg)] || null; },
+    save(map) { gmStore.set('leagueLinks', map); document.dispatchEvent(new CustomEvent('nx:leaguelinks')); },
+    // Returns '' when saved, otherwise a message saying what's wrong with the link.
+    set(lg, sublg, league, url) {
+      const m = this.all(), u = parseServerUrl(url);
+      if (!lgLinkKey(lg, sublg)) return 'No league and level on this page.';
+      if (!u) return "That's not a Discord invite or server channel link.";
+      m[lgLinkKey(lg, sublg)] = { lg, sublg, league: str(league), url: u, addedAt: Date.now() };
+      this.save(m);
+      return '';
+    },
+    remove(lg, sublg) { const m = this.all(); delete m[lgLinkKey(lg, sublg)]; this.save(m); },
+  };
 
   const defName = (x) => (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
   const mlTitle = (x) => x.label || (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
@@ -945,7 +987,7 @@
         if (k && k.startsWith('nx:') && !k.startsWith('nx:gm:') && k !== 'nx:myteam') prefs[k] = localStorage.getItem(k);
       }
     } catch (e) {}
-    return { app: 'nhl94-its-in-the-script', type: 'backup', version: 1, exportedAt: new Date().toISOString(), myLeagues: myLeagues.all(), coachLinks: coachLinks.all(), prefs };
+    return { app: 'nhl94-its-in-the-script', type: 'backup', version: 1, exportedAt: new Date().toISOString(), myLeagues: myLeagues.all(), coachLinks: coachLinks.all(), leagueLinks: leagueLinks.all(), prefs };
   }
   function downloadBackup() {
     const blob = new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' });
@@ -959,6 +1001,7 @@
   function applyBackup(b) {
     myLeagues.save(b.leagues);
     if (b.coachLinks) coachLinks.save(b.coachLinks);
+    if (b.leagueLinks) leagueLinks.save(b.leagueLinks);
     clearPrefs();
     Object.entries(b.prefs).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch (err) {} });
   }
@@ -971,9 +1014,10 @@
     Object.entries(data.prefs || {}).forEach(([k, v]) => { if (/^nx:[\w:.-]+$/.test(k) && !k.startsWith('nx:gm:') && typeof v === 'string' && v.length < 5000) prefs[k] = v; });
     // Older backups have no Discord links (null): restoring them keeps the current ones.
     const links = data.coachLinks && typeof data.coachLinks === 'object' ? cleanLinks(data.coachLinks) : null;
-    return { leagues, coachLinks: links, prefs, exportedAt: data.exportedAt || '' };
+    const lgLinks = data.leagueLinks && typeof data.leagueLinks === 'object' ? cleanLgLinks(data.leagueLinks) : null;
+    return { leagues, coachLinks: links, leagueLinks: lgLinks, prefs, exportedAt: data.exportedAt || '' };
   }
-  function resetAll() { myLeagues.save([]); coachLinks.save({}); clearPrefs(); }
+  function resetAll() { myLeagues.save([]); coachLinks.save({}); leagueLinks.save({}); clearPrefs(); }
   function clearPrefs() {
     try { Object.keys(localStorage).filter((k) => k.startsWith('nx:') && !k.startsWith('nx:gm:')).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
   }
@@ -2666,6 +2710,13 @@
     }
     return `<button type="button" class="nx-dc add" data-dc-link title="Link ${n}'s Discord DM" aria-label="Link ${n}'s Discord DM">${DC_ICON}<span>${full ? '+ Discord DM' : '+ DM'}</span></button>`;
   }
+  // League Discord button in the league bar, for this page's lg + sublg.
+  function lgdcInner() {
+    const l = leagueLinks.get(currentLg(), curSublg()), lv = esc(curSublg());
+    if (l) return `<a class="nx-dc on" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="Open the ${lv} league Discord">${DC_ICON}<span>League Discord</span></a>`
+      + `<button type="button" class="nx-dc-edit" data-lgdc-link title="Change the ${lv} league Discord link" aria-label="Change the ${lv} league Discord link">✎</button>`;
+    return `<button type="button" class="nx-dc add" data-lgdc-link title="Add the Discord for this league and level" aria-label="Add the ${lv} league Discord link">${DC_ICON}<span>+ League Discord</span></button>`;
+  }
   const dcSlot = (coach, full) => (coach ? `<span class="nx-dc-slot" data-coach="${esc(coach)}"${full ? ' data-full="1"' : ''}>${dcInner(coach, full)}</span>` : '');
 
   let setReady = false;
@@ -2679,6 +2730,11 @@
       document.head.appendChild(f);
     }
     addCss(`
+    .nx-lgbar-f.dc { margin-left: auto; }
+    .nx-lgdc-slot { display: inline-flex; align-items: center; gap: 2px; }
+    .nx-lgdc-slot .nx-dc { height: 36px; padding: 0 14px; }
+    .nx-lgdc-slot:hover .nx-dc-edit { opacity: 1; }
+    @media (max-width: 560px) { .nx-lgbar-f.dc { margin-left: 0; } }
     .nx-dc-slot { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
     .nx-dc { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; font: 400 8px/1 "Press Start 2P", monospace;
       letter-spacing: .5px; text-transform: uppercase; text-decoration: none; border: 0; border-radius: 3px; cursor: pointer; white-space: nowrap; }
@@ -2760,7 +2816,10 @@
     `);
     // Chips repaint whenever a link changes; one click handler serves every chip on the page.
     document.addEventListener('nx:coachlinks', () => $$('.nx-dc-slot').forEach((el) => { el.innerHTML = dcInner(el.dataset.coach, !!el.dataset.full); }));
+    document.addEventListener('nx:leaguelinks', () => $$('.nx-lgdc-slot').forEach((el) => { el.innerHTML = lgdcInner(); }));
     document.addEventListener('click', (e) => {
+      const lb = e.target.closest('.nx-lgdc-slot [data-lgdc-link]');
+      if (lb) { e.preventDefault(); e.stopPropagation(); openSettings(lb, { id: 'lgInput', lg: currentLg(), sublg: curSublg(), only: true }); return; }
       const b = e.target.closest('.nx-dc-slot [data-dc-link]');
       if (b) { e.preventDefault(); e.stopPropagation(); openDcDialog(b.closest('.nx-dc-slot').dataset.coach, b); }
     });
@@ -2950,12 +3009,14 @@
     // Each page: { title, text?, field?, items: [{ label, val, sub, help, act, confirm, cycle, off }] }
     function page(p) {
       const leagues = myLeagues.all(), links = Object.values(coachLinks.all()).sort((a, b) => a.coach.localeCompare(b.coach));
+      const lgLinks = Object.values(leagueLinks.all()).sort((a, b) => b.lg - a.lg || a.sublg.localeCompare(b.sublg));
       switch (p.id) {
         case 'root': {
           const nf = Object.keys(filters()).length, other = otherKeys().length;
           return { title: 'Settings', items: [
             { label: 'My Leagues', val: leagues.length ? `${leagues.length} saved` : '', sub: true, help: 'Your coach pages, one per league. Saved as myLeagues (Tampermonkey).', act: () => go('leagues') },
             { label: 'Discord DMs', val: links.length ? `${links.length} linked` : '', sub: true, help: 'Coaches you can DM in one click. Saved as coachLinks (Tampermonkey).', act: () => go('dms') },
+            { label: 'League Discords', val: lgLinks.length ? `${lgLinks.length} linked` : '', sub: true, help: 'One Discord server per league and level. Saved as leagueLinks (Tampermonkey).', act: () => go('lgdcs') },
             { label: 'Colour Mode', val: cap(getMode()), help: 'Enter or ← → switches Day / Night on every page. Saved as nx:theme.', act: flipMode, cycle: flipMode },
             { label: 'Tips & Intros', sub: true, help: 'Replay the My Leagues and Discord DM walkthroughs.', act: () => go('intros') },
             { label: 'Schedule Filters', val: nf ? `${nf} page${nf === 1 ? '' : 's'}` : '', sub: true, help: 'Coach picks, tabs and folded opponents, remembered per coach page.', act: () => go('filters') },
@@ -2978,6 +3039,32 @@
           ...(links.length ? [{ label: 'Clear All Links', confirm: true, help: `Removes all ${links.length} Discord link(s).`, act: () => { coachLinks.save({}); say('Discord links cleared.'); } }] : []),
           BACK,
         ] };
+        case 'lgdcs': {
+          const here = PAGE === 'coach' && lgLinkKey(currentLg(), curSublg());
+          return { title: 'League Discords', items: [
+            ...(here ? [{ label: `This League · ${curSublg()}`, val: leagueLinks.get(currentLg(), curSublg()) ? 'Linked' : '', sub: true, help: 'Link the Discord for the league and level on this page.',
+              act: () => go('lgInput', { lg: currentLg(), sublg: curSublg() }) }] : []),
+            ...lgLinks.map((l) => ({ label: (l.league || 'League ' + l.lg) + ' · ' + l.sublg, val: 'Linked', sub: true, help: l.url.replace('https://', ''),
+              act: () => go('lgInput', { lg: l.lg, sublg: l.sublg }) })),
+            ...(!here && !lgLinks.length ? [{ label: 'None linked yet', off: true, help: 'Press + League Discord next to the level picker on a coach page.' }] : []),
+            ...(lgLinks.length ? [{ label: 'Clear All', confirm: true, help: `Removes all ${lgLinks.length} league Discord link(s).`, act: () => { leagueLinks.save({}); say('League Discord links cleared.'); } }] : []),
+            BACK,
+          ] };
+        }
+        case 'lgInput': {
+          const cur = leagueLinks.get(p.lg, p.sublg);
+          const name = cur && cur.league ? cur.league : (p.lg === currentLg() && (leagueOpts.find((o) => o.sel) || {}).t) || 'League ' + p.lg;
+          return { title: 'League Discord', field: { ph: 'Paste an invite or channel link…', label: `Discord link for ${name} ${p.sublg}`, value: cur ? cur.url : '' },
+            text: [`League: <b>${esc(name)}</b> · Level: <b>${esc(p.sublg)}</b>`,
+              '1. In Discord, right-click the league server and pick <b>Invite People</b>, then copy the invite link.',
+              '   Or right-click the league channel and pick <b>Copy Link</b>.', '2. Paste it here and press Enter.'],
+            items: [
+              { label: 'Save', help: 'The button turns blue. One click opens the league Discord.', act: () => submit() },
+              ...(cur ? [{ label: 'Open Discord', help: cur.url.replace('https://', ''), act: () => window.open(cur.url, '_blank', 'noopener') },
+                { label: 'Remove Link', confirm: true, help: `Forget the ${p.sublg} league Discord.`, act: () => { leagueLinks.remove(p.lg, p.sublg); back(); } }] : []),
+              { label: p.only ? 'Cancel' : 'Back', help: 'Leave without saving.', act: back },
+            ] };
+        }
         case 'dcPick': {
           const coaches = [...new Set(Object.values(teamInfo).map((t) => t.coach).filter(Boolean))].sort((a, b) => a.localeCompare(b));
           return { title: 'Link a Coach', items: [
@@ -3045,7 +3132,7 @@
         case 'restore': {
           const b = p.pending;
           return { title: 'Restore Backup', text: [`From <b>${esc(b.exportedAt ? new Date(b.exportedAt).toLocaleString() : 'an unknown date')}</b>:`,
-            `${b.leagues.length} league(s), ${b.coachLinks ? Object.keys(b.coachLinks).length : 'no'} Discord link(s), ${Object.keys(b.prefs).length} setting(s).`],
+            `${b.leagues.length} league(s), ${b.coachLinks ? Object.keys(b.coachLinks).length : 'no'} Discord link(s), ${b.leagueLinks ? Object.keys(b.leagueLinks).length : 'no'} league Discord(s), ${Object.keys(b.prefs).length} setting(s).`],
           items: [
             { label: 'Restore', confirm: true, help: 'Replaces what is saved now, then reloads.', act: () => { applyBackup(b); location.reload(); } },
             { label: 'Cancel', help: 'Keep what you have.', act: back },
@@ -3060,6 +3147,13 @@
       if (p.id === 'dcName') {
         if (!norm(v)) return say('Type the coach name first.', true);
         stack.pop(); return go('dcInput', { coach: norm(v) });
+      }
+      if (p.id === 'lgInput') {
+        const name = p.lg === currentLg() ? (leagueOpts.find((o) => o.sel) || {}).t || '' : (leagueLinks.get(p.lg, p.sublg) || {}).league || '';
+        const e2 = leagueLinks.set(p.lg, p.sublg, name, v);
+        if (e2) return say(e2, true);
+        if (p.only) return close();
+        back(); return say('League Discord linked!');
       }
       const err = coachLinks.set(p.coach, v);
       if (err) return say(err, true);
