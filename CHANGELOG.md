@@ -3,6 +3,11 @@
 Every release of **NHL94 – It's In The Script**, newest first, in plain English.
 Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.PATCH**. MAJOR goes up for big shake-ups, MINOR for new stuff, PATCH for fixes and polish.
 
+## [2.0.1] – 2026-10-05
+
+### 🐛 Fixed
+- The new-look switch still wore its old **V1** jersey after the big 2.0 trade. It now shows **v2**, and it'll update itself at the next big release.
+
 ## [2.0.0] – 2026-10-05
 
 ### ✨ New
@@ -59,6 +64,7 @@ Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.
 - **The coach page, redesigned.** Coach names next to every team, the schedule grouped by opponent, filters that remember you, and a checkpoint countdown.
 - A **Classic / V1** switch so the original site is always one click away.
 
+[2.0.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.4.1...v2.0.0
 [1.4.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.1.2...v1.4.1
 [1.1.2]: https://github.com/codystewy/nhl94-its-in-the-script/releases/tag/v1.1.2
