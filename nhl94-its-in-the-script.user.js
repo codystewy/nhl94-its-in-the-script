@@ -740,17 +740,20 @@
       this.save(l);
     },
   };
-  // Coach → Discord link, so a coach name can open a chat with them.
-  // Accepts a profile link (discord.com/users/<id>) or a DM link (discord.com/channels/@me/<id>).
+  // Coach → Discord DM, so a coach name opens a private chat with them.
+  // New links must be a DM link: discord.com/channels/@me/<chat id>, or a message link from that DM
+  // (…/@me/<chat id>/<message id>, trimmed to the chat). Discord can't open a DM from a profile link
+  // (discord.com/users/<id>); those are still read from older saves and open the profile.
   // Saved next to My Leagues (GM storage) as { [lower-case coach]: { coach, url, addedAt } }.
   function parseDiscordUrl(url) {
     try {
       const u = new URL(String(url || '').trim());
       if (!/^(www\.|canary\.|ptb\.)?discord(app)?\.com$/i.test(u.hostname)) return '';
-      const m = u.pathname.match(/^\/(users|channels\/@me)\/(\d{15,21})\/?$/);
-      return m ? `https://discord.com/${m[1]}/${m[2]}` : '';
+      const m = u.pathname.match(/^\/(users|channels\/@me)\/(\d{15,21})(\/\d{15,21})?\/?$/);
+      return m && !(m[1] === 'users' && m[3]) ? `https://discord.com/${m[1]}/${m[2]}` : '';
     } catch (e) { return ''; }
   }
+  const isDmUrl = (url) => url.startsWith('https://discord.com/channels/@me/');
   const coachKey = (c) => norm(c).toLowerCase();
   function cleanLinks(raw) {
     const out = {};
@@ -764,12 +767,15 @@
     all() { return cleanLinks(gmStore.get('coachLinks', {})); },
     get(coach) { return coach ? this.all()[coachKey(coach)] || null : null; },
     save(map) { gmStore.set('coachLinks', map); document.dispatchEvent(new CustomEvent('nx:coachlinks')); },
+    // Returns '' when saved, otherwise a message saying what's wrong with the link.
     set(coach, url) {
       const m = this.all(), u = parseDiscordUrl(url);
-      if (!norm(coach) || !u) return false;
+      if (!norm(coach)) return 'Type the coach name first.';
+      if (!u) return "That's not a Discord DM link.";
+      if (!isDmUrl(u)) return "That's a profile link, and Discord can't open a DM from it. Copy a message link from your DM with them instead.";
       m[coachKey(coach)] = { coach: str(norm(coach), 60), url: u, addedAt: Date.now() };
       this.save(m);
-      return true;
+      return '';
     },
     remove(coach) { const m = this.all(); delete m[coachKey(coach)]; this.save(m); },
   };
@@ -1812,7 +1818,8 @@
   function dcInner(coach, full) {
     const l = coachLinks.get(coach), n = esc(coach);
     if (l) {
-      return `<a class="nx-dc on" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="Chat with ${n} on Discord">${DC_ICON}<span>Chat</span></a>`
+      const dm = isDmUrl(l.url);
+      return `<a class="nx-dc on" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="${dm ? `Open your Discord DM with ${n}` : `Opens ${n}'s Discord profile. Press ✎ to swap in a DM link.`}">${DC_ICON}<span>${dm ? 'Chat' : 'Profile'}</span></a>`
         + `<button type="button" class="nx-dc-edit" data-dc-link title="Change ${n}'s Discord link" aria-label="Change ${n}'s Discord link">✎</button>`;
     }
     return `<button type="button" class="nx-dc add" data-dc-link title="Link ${n}'s Discord" aria-label="Link ${n}'s Discord">${DC_ICON}<span>${full ? '+ Discord' : '+'}</span></button>`;
@@ -1958,8 +1965,9 @@
     return false;
   }
 
-  const DC_HOWTO = `<ol class="nx-set-steps"><li>In Discord, copy your friend's link (on their profile or in your DMs).</li>
-    <li>Paste it here. It looks like <code>https://discord.com/users/123…</code> or <code>…/channels/@me/123…</code></li></ol>`;
+  const DC_HOWTO = `<ol class="nx-set-steps"><li>In Discord, open your DM with them. If you've never chatted, send them a message first.</li>
+    <li>Right-click any message in that DM and choose <b>Copy Message Link</b>.</li>
+    <li>Paste it here. It looks like <code>https://discord.com/channels/@me/123…</code></li></ol>`;
 
   // Small window to link (or change / remove) one coach's Discord.
   function openDcDialog(coach, opener) {
@@ -1970,7 +1978,7 @@
       <form class="nx-set-b">
         ${DC_HOWTO}
         <div class="nx-set-form" style="padding:12px 0 0;border:0">
-          <input class="nx-set-in" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a Discord link…" aria-label="Discord link for ${esc(coach)}" value="${esc(cur ? cur.url : '')}">
+          <input class="nx-set-in" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a message link from your DM…" aria-label="Discord DM link for ${esc(coach)}" value="${esc(cur ? cur.url : '')}">
         </div>
         <div class="nx-set-msg" role="status" aria-live="polite"></div>
         <div class="acts" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
@@ -1982,7 +1990,8 @@
     const input = $('input', w.el), m = $('.nx-set-msg', w.el);
     $('form', w.el).addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!coachLinks.set(coach, input.value)) { m.className = 'nx-set-msg err'; m.textContent = "That's not a Discord user or DM link."; input.focus(); return; }
+      const err = coachLinks.set(coach, input.value);
+      if (err) { m.className = 'nx-set-msg err'; m.textContent = err; input.focus(); return; }
       w.close();
     });
     w.el.addEventListener('click', (e) => { const b = e.target.closest('[data-set="unlink"]'); if (b && armed(b)) { coachLinks.remove(coach); w.close(); } });
@@ -2043,14 +2052,14 @@
           leagues.length ? esc(leagues.map(mlTitle).join(' · ')) : 'Add one with ★ Add to My Leagues on a coach page.',
           'myLeagues (Tampermonkey)', leagues.length ? btn('clear-leagues', 'Clear') : ''))
 
-        + sec('02', 'Discord links', (links.length
-          ? links.map((l) => row(esc(l.coach), '', esc(l.url.replace('https://', '')), '',
-            `<a class="nx-set-btn dc" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${DC_ICON}Chat</a>`
+        + sec('02', 'Discord DMs', (links.length
+          ? links.map((l) => row(esc(l.coach), isDmUrl(l.url) ? '' : 'Profile only: edit to add a DM link', esc(l.url.replace('https://', '')), '',
+            `<a class="nx-set-btn dc" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${DC_ICON}${isDmUrl(l.url) ? 'Chat' : 'Profile'}</a>`
             + btn('dc-edit', 'Edit', 'alt', ` data-coach="${esc(l.coach)}"`) + btn('dc-del', 'Remove', '', ` data-coach="${esc(l.coach)}"`))).join('')
-          : '<div class="nx-set-empty">No coaches linked yet. Press <b>+</b> next to a coach name, or add one here.</div>')
+          : '<div class="nx-set-empty">No coaches linked yet. Press <b>+</b> next to a coach name, or add one here: in your DM with them, right-click a message › <b>Copy Message Link</b>.</div>')
           + `<form class="nx-set-form" data-set="dc-add">
               <input class="nx-set-in coach" name="coach" list="nx-set-coaches" autocomplete="off" placeholder="Coach name" aria-label="Coach name" required>
-              <input class="nx-set-in" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste their Discord link…" aria-label="Discord link" required>
+              <input class="nx-set-in" name="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a message link from your DM…" aria-label="Discord DM link" required>
               <button type="submit" class="nx-set-btn gold">Link</button>
               <datalist id="nx-set-coaches">${coaches.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></form>`,
           links.length ? btn('clear-links', 'Clear all') : '')
@@ -2089,7 +2098,8 @@
       const f = e.target;
       if (f.dataset.set !== 'dc-add') return;
       const coach = norm(f.coach.value);
-      if (!coachLinks.set(coach, f.url.value)) return say(coach ? "That's not a Discord user or DM link." : 'Type the coach name first.', true);
+      const err = coachLinks.set(coach, f.url.value);
+      if (err) return say(err, true);
       say(`Linked ${coach}!`);
     });
     w.el.addEventListener('click', (e) => {
