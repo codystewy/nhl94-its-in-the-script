@@ -70,10 +70,31 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 2. Add `{ id: 'vN', label: 'VN', title: 'VN · <Name>', render: renderVN }` to the end of `VERSIONS`.
 3. Add a row for it to the README "Switching views" table.
 
-## Every change: verify, then release
+## Every change: verify and commit
 
 1. `node --check nhl94-its-in-the-script.user.js`
-2. `dev/preview.sh 6716 <view>`, `dev/preview.sh 6714 <view>`, and `SUBLG=SNES-CD dev/preview.sh home <view>` (add `MYLEAGUES='[...]'` to test My Leagues). Then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
-3. Raise `@version` in the header (semver: patch for fixes, minor for a new feature or design version, major for breaking changes). Tampermonkey only auto-updates when this number goes up.
-4. Commit with a clear message, then push to `main` only when the user asks. Auto-update reads `https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js`, and that only works while the repo is public.
-5. Tell the user what changed, what you verified (and what you didn't), and the new version number.
+2. `dev/preview.sh 6716 <view>`, `dev/preview.sh 6714 <view>`, and `SUBLG=SNES-CD dev/preview.sh home <view>`. Add `MYLEAGUES='[...]'` to test My Leagues, and set `nx:theme` via `EXTRA_JS` to check Day mode too. Then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
+3. **Commit each change separately with a [Conventional Commits](https://www.conventionalcommits.org) prefix** so changes are easy to track by category:
+   - `feat(scope):` adds a feature. `fix(scope):` fixes a bug. `style(scope):` changes looks or design with no behaviour change.
+   - `docs:` README/INSTALL/CHANGELOG. `refactor:` code restructure. `perf:` speed. `chore:` tooling, dev scripts, release bumps.
+   - The scope is the area: `home`, `coach`, `theme`, `my-leagues`, `nav`, `standings`, `install`…
+   - Example: `fix(standings): teams listed under a short name were not clickable`.
+4. **Don't raise `@version` for everyday commits.** Versions are raised only at release time (below).
+5. Tell the user what changed, what you verified (and what you didn't).
+
+## Releases (the user says "wrap these up into a release", then "push changes")
+
+- **Versioning:** [SemVer](https://semver.org) `1.MINOR.PATCH`.
+  - Any `feat` raises MINOR (1.4.1 → 1.5.0).
+  - Only `fix`/`style`/`perf` raise PATCH (1.4.1 → 1.4.2).
+  - Only `docs`/`chore`/`refactor`/dev-tooling changes **don't warrant a release**. Tell the user that, and offer to push without a version change.
+  - Breaking changes (removed features, wiped saved data) would be 2.0.0. Ask first.
+- **Steps:**
+  1. List the changes since the last tag: `git log --oneline $(git describe --tags --abbrev=0)..HEAD`. Propose the new version number.
+  2. Bump `@version` in the script header. Tampermonkey only auto-updates users when this number goes up, so pushed code changes without a bump never reach anyone.
+  3. Add a CHANGELOG.md entry: `## [x.y.z] – YYYY-MM-DD` grouped under ✨ New / 🎨 Looks / 🐛 Fixed / 📖 Docs. Add a compare link at the bottom.
+  4. Replace the README **"What's new"** section with the new release.
+  5. Commit as `chore(release): vX.Y.Z`, then tag with `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+  6. On "push": `git push origin main --follow-tags`. Optionally run `gh release create vX.Y.Z --notes-file <that changelog section>`.
+- **Writing style for CHANGELOG and What's new:** plain English and a bit funny, with hockey puns welcome. **No technical jargon** (no "refactor", "tokens", "localStorage", "DOM"). Say what a player notices.
+- The one-line origin note at the top of the README ("It started with just wanting a dark and night mode…") was requested by the user. Keep it, and don't add any other purpose or motivation statements.
