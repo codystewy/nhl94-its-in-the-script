@@ -530,19 +530,23 @@
     .nx-seg button.on { background: var(--nx-red); color: var(--nx-on-red); }
     .nx-seg button .n { opacity: .65; margin-left: 5px; }
     .nx-lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-dim); letter-spacing: .5px; margin-right: 4px; }
-    .nx-ctrl-row { justify-content: space-between; }
+    .nx-ctrl-row { gap: 12px; }
     .nx-cf { position: relative; display: flex; align-items: center; gap: 6px; }
-    .nx-cf-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px 4px 12px; font: 600 13px var(--nx-ui); color: var(--nx-text);
-      background: var(--nx-bg2); border: 1px solid var(--nx-line2); border-radius: 6px; cursor: pointer; white-space: nowrap; }
-    .nx-cf-btn .nx-lab { margin-right: 2px; }
-    .nx-cf-btn:hover, .nx-cf-btn[aria-expanded="true"] { border-color: var(--nx-acc); }
-    .nx-cf-btn.on { border-color: var(--nx-gold); box-shadow: inset 0 0 0 1px var(--nx-gold); }
+    .nx-cf-btn { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 12px 4px 12px; font: 600 14px var(--nx-ui); color: var(--nx-text);
+      background: color-mix(in srgb, var(--nx-red) 16%, var(--nx-bg2)); border: 2px solid var(--nx-red); border-radius: 6px; cursor: pointer; white-space: nowrap;
+      box-shadow: 3px 3px 0 rgba(0,0,0,.3); transition: background .15s, transform .1s; }
+    .nx-cf-btn .nx-lab { margin-right: 0; font-size: 8px; color: var(--nx-acc); }
+    .nx-cf-btn:hover, .nx-cf-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--nx-red) 30%, var(--nx-bg2)); }
+    .nx-cf-btn:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 rgba(0,0,0,.3); }
+    .nx-cf-btn.on { color: var(--nx-on-red); background: var(--nx-red); border-color: var(--nx-gold); box-shadow: 3px 3px 0 rgba(0,0,0,.3), inset 0 0 0 1px var(--nx-gold); }
+    .nx-cf-btn.on .nx-lab { color: inherit; opacity: .8; }
+    .nx-cf-val .logos.hint .nx-logo { opacity: .85; }
     .nx-cf-btn:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
     .nx-cf-val { display: inline-flex; align-items: center; gap: 7px; }
     .nx-cf-val .logos { display: inline-flex; }
     .nx-cf-val .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; }
-    .nx-cf-val .nx-logo + .nx-logo { margin-left: -6px; }
-    .nx-cf-car { width: 0; height: 0; margin-left: 2px; border: 5px solid transparent; border-top: 6px solid var(--nx-mute); border-bottom: 0; font-size: 0; transition: transform .15s; }
+    .nx-cf-val .logos { gap: 3px; }
+    .nx-cf-car { width: 0; height: 0; margin-left: 2px; border: 5px solid transparent; border-top: 6px solid currentColor; border-bottom: 0; font-size: 0; transition: transform .15s; }
     .nx-card:has(.nx-cf-menu:not([hidden])) { overflow: visible; } /* let the open menu hang past a short schedule */
     .nx-cf-btn[aria-expanded="true"] .nx-cf-car { transform: rotate(180deg); }
     .nx-cf-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 320px; max-width: calc(100vw - 32px); max-height: 420px; overflow-y: auto;
@@ -1474,7 +1478,7 @@
     // Coach filter dropdown: logo + coach + their Discord DM button, pick one or more.
     const coachOf = (opp) => (teamInfo[opp] && teamInfo[opp].coach) || opp;
     const coachFilterHtml = `<div class="nx-cf">
-        <button type="button" class="nx-cf-btn" aria-haspopup="true" aria-expanded="false" title="Show games against these coaches"><span class="nx-lab">COACH</span><span class="nx-cf-val"></span><span class="nx-cf-car" aria-hidden="true"></span></button>
+        <button type="button" class="nx-cf-btn" aria-haspopup="true" aria-expanded="false" title="Show games against these coaches"><span class="nx-lab">FILTER BY COACH</span><span class="nx-cf-val"></span><span class="nx-cf-car" aria-hidden="true"></span></button>
         <button type="button" class="nx-clear" id="nx-clear" hidden>Clear</button>
         <div class="nx-cf-menu" role="menu" aria-label="Filter by coach" hidden>
           <div class="nx-cf-item all" role="menuitemradio" tabindex="-1" data-opp=""><span class="nx-cf-box" aria-hidden="true"></span><span class="nm">All coaches</span></div>
@@ -1633,7 +1637,7 @@
     function apply() {
       $$('.nx-cf-item', app).forEach((it) => it.setAttribute('aria-checked', String(it.dataset.opp ? selected.has(it.dataset.opp) : !selected.size)));
       const picked = groups.filter((g) => selected.has(g.opp));
-      $('.nx-cf-val', app).innerHTML = !picked.length ? '<span class="nm">All coaches</span>'
+      $('.nx-cf-val', app).innerHTML = !picked.length ? `<span class="logos hint">${groups.slice(0, 4).map((g) => logoImg(g.opp)).join('')}</span><span class="nm">All coaches</span>`
         : `<span class="logos">${picked.slice(0, 3).map((g) => logoImg(g.opp)).join('')}</span><span class="nm">${picked.length === 1 ? esc(coachOf(picked[0].opp)) : picked.length + ' coaches'}</span>`;
       $('.nx-cf-btn', app).classList.toggle('on', !!picked.length);
       $$('button', seg).forEach((b) => b.classList.toggle('on', b.dataset.v === mode));
