@@ -5,7 +5,8 @@
 #            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
 #   EXTRA_JS='...' runs before the script (e.g. preset filters: localStorage.setItem("nx:mode:", '"done"'))
-#   MYTEAM='{"href":"...","team":"Calgary","coach":"Stewy","level":"SNES-CD"}' pre-pins a team
+#   MYLEAGUES='[{"path":"/html/coachpage.php?lg=287&sublg=SNES-CD&team_ID=6714","team":"Calgary","coach":"Stewy","league":"Classic \'94-2026 Fall"}]'
+#            seeds My Leagues (stored via the localStorage fallback, since there's no Tampermonkey here)
 # Output: dev/out/preview-<team_ID>-<view>.png
 set -euo pipefail
 
@@ -28,15 +29,15 @@ else
 fi
 curl -sL "$URL" -o "$OUT/page.html"
 
-python3 - "$ROOT/nhl94-its-in-the-script.user.js" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYTEAM:-}" <<'EOF'
+python3 - "$ROOT/nhl94-its-in-the-script.user.js" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYLEAGUES:-}" "$URL" <<'EOF'
 import sys, json
-js_path, src, out, view, tpath, base, myteam = sys.argv[1:8]
+js_path, src, out, view, tpath, base, myleagues, url = sys.argv[1:9]
 js = open(js_path, encoding='utf-8').read()
 s = open(src, encoding='latin-1').read()
 s = s.replace('charset=iso-8859-1', 'charset=utf-8').replace('<head>', f'<head><base href="{base}">', 1)
-pre = f'window.__nxTestPath={json.dumps(tpath)};localStorage.clear();' + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
-if myteam:
-    pre += f'localStorage.setItem("nx:myteam",{json.dumps(myteam)});'
+pre = f'window.__nxTestPath={json.dumps(tpath)};window.__nxTestHref={json.dumps(url)};localStorage.clear();' + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
+if myleagues:
+    pre += f'localStorage.setItem("nx:gm:myLeagues",{json.dumps(myleagues)});'
 import os
 pre += os.environ.get('EXTRA_JS', '')
 s = s.replace('</body>', '<script>' + pre + 'window.addEventListener("load",()=>{try{' + js +

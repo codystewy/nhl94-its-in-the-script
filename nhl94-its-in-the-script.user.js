@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.2.1
+// @version      1.3.0
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -13,6 +13,8 @@
 // @match        https://www.nhl94online.com/*
 // @match        http://www.nhl94online.com/*
 // @grant        GM_addStyle
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -36,7 +38,8 @@
     set(k, v) { try { localStorage.setItem('nx:' + k, JSON.stringify(v)); } catch (e) {} },
   };
   // Which page are we on? Pages without a redesign are left untouched.
-  const PATH = window.__nxTestPath || location.pathname; // __nxTestPath: set by dev/preview.sh only
+  const PATH = window.__nxTestPath || location.pathname; // __nxTestPath / __nxTestHref: set by dev/preview.sh only
+  const HREF = window.__nxTestHref || location.href;
   const PAGE = /\/html\/coachpage\.php$/i.test(PATH) ? 'coach'
     : /^\/(index\.php)?$/i.test(PATH) ? 'home'
     : null;
@@ -388,7 +391,6 @@
     .nx-btn:hover { background: var(--nx-red-d); border-color: var(--nx-gold); }
     .nx-btn.gold { background: var(--nx-gold); border-color: var(--nx-gold); color: #111 !important; }
     .nx-btn.gold:hover { background: #ffd36b; }
-    .nx-btn.nx-pin[aria-pressed="true"] { border-color: var(--nx-gold); color: var(--nx-gold) !important; }
     button.nx-btn { font-family: var(--nx-cond); }
 
     /* ---------- Cards ---------- */
@@ -547,6 +549,7 @@
         <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
       <header class="nx-top">
         <a class="nx-brand" href="/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
+        <div class="nx-ml"><button type="button" class="nx-ml-btn" aria-expanded="false" aria-haspopup="true" title="Your teams in each league"><span class="nx-star">★</span><span class="lbl">My Leagues</span><span class="nx-ml-count"></span></button><div class="nx-ml-menu" hidden></div></div>
         <button type="button" class="nx-menu-btn" aria-expanded="false" aria-controls="nx-nav">☰ Menu</button>
         <nav class="nx-nav" id="nx-nav">${navHtml}</nav>
       </header>`,
@@ -580,6 +583,412 @@
     }));
   }
 
+  // ============================================================
+  // My Leagues: the user's own coach pages, one per league/level.
+  // Saved with Tampermonkey storage (GM_*) so nhl94online.com and
+  // www.nhl94online.com share it; falls back to localStorage.
+  // ============================================================
+  const gmStore = {
+    get(k, d) {
+      try { if (typeof GM_getValue === 'function') { const v = GM_getValue(k); return v === undefined ? d : v; } } catch (e) {}
+      return store.get('gm:' + k, d);
+    },
+    set(k, v) {
+      try { if (typeof GM_setValue === 'function') { GM_setValue(k, v); return; } } catch (e) {}
+      store.set('gm:' + k, v);
+    },
+  };
+  const coachPath = (lg, sublg, teamId) =>
+    `/html/coachpage.php?lg=${encodeURIComponent(lg)}&sublg=${encodeURIComponent(sublg)}&team_ID=${encodeURIComponent(teamId)}`;
+  function parseCoachUrl(url) {
+    try {
+      const u = new URL(String(url || '').trim(), 'https://www.nhl94online.com');
+      if (!/(^|\.)nhl94online\.com$/i.test(u.hostname) || !/\/html\/coachpage\.php$/i.test(u.pathname)) return null;
+      const lg = u.searchParams.get('lg'), sublg = u.searchParams.get('sublg') || '', teamId = u.searchParams.get('team_ID');
+      if (!/^\d+$/.test(lg || '') || !/^\d+$/.test(teamId || '')) return null;
+      return { id: lg + ':' + teamId, lg, sublg, teamId, path: coachPath(lg, sublg, teamId) };
+    } catch (e) { return null; }
+  }
+  const str = (v, max = 80) => String(v == null ? '' : v).slice(0, max);
+  function cleanLeague(x) {
+    const p = x && parseCoachUrl(x.path || x.href);
+    return p ? { ...p, team: str(x.team), coach: str(x.coach), league: str(x.league), label: str(x.label), addedAt: +x.addedAt || Date.now() } : null;
+  }
+  const myLeagues = {
+    all() {
+      let list = gmStore.get('myLeagues', null);
+      if (!Array.isArray(list)) {
+        list = [];
+        const old = store.get('myteam', null); // migrate the earlier single "my team" pin
+        const rec = old && cleanLeague({ ...old, league: old.league, path: old.href });
+        if (rec) list.push(rec);
+        gmStore.set('myLeagues', list);
+      }
+      return list.map(cleanLeague).filter(Boolean);
+    },
+    save(list) { gmStore.set('myLeagues', list.map(cleanLeague).filter(Boolean)); document.dispatchEvent(new CustomEvent('nx:myleagues')); },
+    has(id) { return this.all().some((x) => x.id === id); },
+    toggle(rec) {
+      const l = this.all(), i = l.findIndex((x) => x.id === rec.id);
+      if (i >= 0) l.splice(i, 1); else l.push(rec);
+      this.save(l);
+    },
+  };
+  const defName = (x) => (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
+  const mlTitle = (x) => x.label || (x.team ? fullTeamName(x.team) : 'Team #' + x.teamId);
+  const mlSub = (x) => [x.coach, x.sublg, x.league].filter(Boolean).join(' · ');
+  const currentLg = () => params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '';
+
+  // Read team / coach / season from any coach page (used when adding by link).
+  async function fetchCoachInfo(p) {
+    const res = await fetch(location.origin + p.path, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const doc = new DOMParser().parseFromString(new TextDecoder('windows-1252').decode(await res.arrayBuffer()), 'text/html');
+    const hw = doc.querySelector('.heading_white');
+    if (!hw) throw new Error('not a coach page');
+    const link = [...doc.querySelectorAll('a[href*="coachpage.php"]')].find((a) => new RegExp('team_ID=' + p.teamId + '(\\D|$)').test(a.getAttribute('href') || ''));
+    const opt = doc.querySelector('select[name="lg"] option[selected]');
+    return {
+      team: link ? norm(link.textContent) : '',
+      coach: norm((hw.innerHTML.split(/<br\s*\/?>/i)[0] || '').replace(/<[^>]+>/g, '').replace(/^Coach:\s*/i, '')),
+      league: opt ? norm(opt.textContent) : '',
+    };
+  }
+
+  // Backup file: My Leagues plus every saved setting (nx:* keys) for this browser.
+  function buildBackup() {
+    const prefs = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('nx:') && !k.startsWith('nx:gm:') && k !== 'nx:myteam') prefs[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    return { app: 'nhl94-its-in-the-script', type: 'backup', version: 1, exportedAt: new Date().toISOString(), myLeagues: myLeagues.all(), prefs };
+  }
+  function readBackup(text) {
+    let data;
+    try { data = JSON.parse(text); } catch (e) { throw new Error("That isn't a valid backup file (not JSON)."); }
+    if (!data || data.app !== 'nhl94-its-in-the-script' || !Array.isArray(data.myLeagues)) throw new Error("That file isn't an NHL94 – It's In The Script backup.");
+    const leagues = data.myLeagues.map(cleanLeague).filter(Boolean);
+    const prefs = {};
+    Object.entries(data.prefs || {}).forEach(([k, v]) => { if (/^nx:[\w:.-]+$/.test(k) && !k.startsWith('nx:gm:') && typeof v === 'string' && v.length < 5000) prefs[k] = v; });
+    return { leagues, prefs, exportedAt: data.exportedAt || '' };
+  }
+  function clearPrefs() {
+    try { Object.keys(localStorage).filter((k) => k.startsWith('nx:') && !k.startsWith('nx:gm:')).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  }
+
+  let mlCssDone = false;
+  function mlSetup() {
+    if (mlCssDone) return;
+    mlCssDone = true;
+    addCss(`
+    .nx-star { font-family: var(--nx-ui); }
+    .nx-ml { position: relative; flex: none; order: 3; }
+    .nx-top .nx-nav { order: 2; }
+    .nx-top .nx-menu-btn { order: 4; }
+    .nx-ml-btn { display: inline-flex; align-items: center; gap: 7px; font: 600 14px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase;
+      color: #fff; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.18); border-radius: 6px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+    .nx-ml-btn:hover, .nx-ml-btn[aria-expanded="true"] { border-color: var(--nx-yellow, var(--nx-gold)); color: var(--nx-yellow, var(--nx-gold)); }
+    .nx-ml-btn .nx-star { color: var(--nx-yellow, var(--nx-gold)); }
+    .nx-ml-count { font: 400 8px var(--nx-px); background: var(--nx-red); color: #fff; padding: 3px 5px; border-radius: 3px; }
+    .nx-ml-count:empty { display: none; }
+    .nx-ml-menu { position: absolute; right: 0; top: calc(100% + 10px); width: 340px; max-width: calc(100vw - 24px); z-index: 60; padding: 6px;
+      background: var(--nx-card); color: var(--nx-text); border: 1px solid var(--nx-line2); border-top: 3px solid var(--nx-red); border-radius: 0 0 10px 10px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+    .nx-ml-menu[hidden] { display: none; }
+    .nx-ml-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; }
+    .nx-ml-item:hover { background: var(--nx-card2); }
+    .nx-ml-item.cur { box-shadow: inset 3px 0 0 var(--nx-red); }
+    .nx-ml-item .nx-logo { width: 26px; height: 26px; image-rendering: pixelated; flex: none; }
+    .nx-ml-item b { display: block; font: 600 15px var(--nx-cond); text-transform: uppercase; letter-spacing: .5px; color: var(--nx-text); line-height: 1.2; }
+    .nx-ml-item small { display: block; font-size: 12px; color: var(--nx-mute); }
+    .nx-ml-empty { padding: 12px 10px; font-size: 13px; color: var(--nx-mute); }
+    .nx-ml-manage { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; text-align: left; font: 600 13px var(--nx-ui); color: var(--nx-gold);
+      background: none; border: 0; border-top: 1px solid var(--nx-line); cursor: pointer; }
+    .nx-ml-manage:hover { background: var(--nx-card2); }
+    @media (max-width: 1180px) { .nx-ml { margin-left: auto; } .nx-menu-btn { margin-left: 0; } }
+    @media (max-width: 480px) { .nx-ml-btn .lbl { display: none; } }
+
+    .nx-btn.nx-ml-add[aria-pressed="true"] { border-color: var(--nx-gold); color: var(--nx-gold) !important; }
+
+    .nx-modal { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; padding: 16px; background: rgba(5,8,14,.66); backdrop-filter: blur(3px); }
+    .nx-modal[hidden] { display: none; }
+    .nx-modal-box { width: min(640px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden;
+      background: var(--nx-card); color: var(--nx-text); border: 1px solid var(--nx-line2); border-top: 4px solid var(--nx-red); border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+    .nx-modal-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--nx-line); }
+    .nx-modal-h h2 { margin: 0; font: 600 20px var(--nx-cond); letter-spacing: 1.5px; text-transform: uppercase; }
+    .nx-x { font-size: 18px; line-height: 1; color: var(--nx-mute); background: none; border: 0; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+    .nx-x:hover { color: var(--nx-text); background: var(--nx-card2); }
+    .nx-modal-b { padding: 14px 18px; overflow-y: auto; font-size: 14px; }
+    .nx-modal-f { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--nx-line); background: var(--nx-bg2); }
+    .nx-mm-dirty { margin-right: auto; font-size: 13px; color: var(--nx-mute); }
+    .nx-mm-dirty.warn { color: var(--nx-red); font-weight: 600; }
+    .nx-mm-help { margin: 0 0 12px; color: var(--nx-mute); font-size: 13px; }
+    .nx-mm-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--nx-line); }
+    .nx-mm-row .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-mm-row .info { flex: 1; min-width: 0; }
+    .nx-mm-row input { width: 100%; font: 600 14px var(--nx-ui); color: var(--nx-text); background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 4px 6px; }
+    .nx-mm-row input:hover { border-color: var(--nx-line2); }
+    .nx-mm-row input:focus { border-color: var(--nx-gold); background: var(--nx-bg2); outline: none; }
+    .nx-mm-row small { display: block; padding: 0 7px; font-size: 12px; color: var(--nx-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-mm-row .acts { display: flex; gap: 4px; flex: none; }
+    .nx-ib { width: 32px; height: 32px; display: grid; place-items: center; font-size: 14px; color: var(--nx-mute); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 6px; cursor: pointer; }
+    .nx-ib:hover:not(:disabled) { color: var(--nx-text); border-color: var(--nx-gold); }
+    .nx-ib:disabled { opacity: .35; cursor: default; }
+    .nx-ib.del:hover { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-mm-empty { padding: 14px 0; color: var(--nx-mute); }
+    .nx-mm-add { display: flex; gap: 8px; margin-top: 12px; }
+    .nx-mm-add input, .nx-mm-sec textarea { flex: 1; min-width: 0; font: 13px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 6px; padding: 8px 10px; }
+    .nx-mm-sec textarea { width: 100%; margin: 8px 0; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .nx-mm-add input:focus, .nx-mm-sec textarea:focus { outline: 2px solid var(--nx-gold); outline-offset: 0; }
+    .nx-mm-msg { min-height: 20px; margin-top: 8px; font-size: 13px; }
+    .nx-mm-msg.ok { color: var(--nx-win); } .nx-mm-msg.err { color: var(--nx-loss); }
+    .nx-t94 .nx-mm-msg.ok { color: #0a7a35; } .nx-t94 .nx-mm-msg.err { color: #b00020; }
+    .nx-mm-sec { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--nx-line2); }
+    .nx-mm-sec h3 { margin: 0 0 4px; font: 600 14px var(--nx-cond); letter-spacing: 1.2px; text-transform: uppercase; }
+    .nx-mm-sec p { margin: 0 0 10px; font-size: 12px; color: var(--nx-mute); }
+    .nx-mm-sec .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .nx-mm-sec summary { cursor: pointer; margin-top: 10px; font-size: 13px; color: var(--nx-gold); }
+    .nx-mm-box { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--nx-line2); border-left: 4px solid var(--nx-gold); border-radius: 6px; background: var(--nx-bg2); font-size: 13px; }
+    .nx-mm-box.danger { border-left-color: var(--nx-red); }
+    .nx-mm-box[hidden] { display: none; }
+    .nx-mm-box .row { margin-top: 8px; }
+    .nx-mbtn { font: 600 13px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2); border: 1px solid var(--nx-line2); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+    .nx-mbtn:hover:not(:disabled) { border-color: var(--nx-gold); }
+    .nx-mbtn.primary { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-mbtn.primary:hover:not(:disabled) { filter: brightness(1.12); }
+    .nx-mbtn.primary:disabled { opacity: .45; cursor: default; }
+    .nx-mbtn.danger { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    `);
+  }
+
+  function mlMenuHtml() {
+    const l = myLeagues.all();
+    const cur = PAGE === 'coach' ? (parseCoachUrl(HREF) || {}).id : '';
+    return (l.length
+      ? l.map((x) => `<a class="nx-ml-item${x.id === cur ? ' cur' : ''}" href="${esc(x.path)}">${logoImg(x.team)}<span><b>${esc(mlTitle(x))}</b><small>${esc(mlSub(x))}</small></span></a>`).join('')
+      : '<div class="nx-ml-empty">No leagues yet. Open one of your coach pages and press <b>+ Add to My Leagues</b>.</div>')
+      + '<button type="button" class="nx-ml-manage">⚙ Manage, back up &amp; restore…</button>';
+  }
+
+  // Top-bar menu + manager dialog, wired once per V1 root.
+  function mlWire(app) {
+    mlSetup();
+    const btn = $('.nx-ml-btn', app), menu = $('.nx-ml-menu', app), count = $('.nx-ml-count', app);
+    const paint = () => { menu.innerHTML = mlMenuHtml(); const n = myLeagues.all().length; count.textContent = n ? String(n) : ''; };
+    const setOpen = (open) => { menu.hidden = !open; btn.setAttribute('aria-expanded', String(open)); if (open) paint(); };
+    btn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(menu.hidden); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.nx-ml')) setOpen(false); });
+    menu.addEventListener('click', (e) => { if (e.target.closest('.nx-ml-manage')) { setOpen(false); openManager(app); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+    document.addEventListener('nx:myleagues', paint);
+    paint();
+    app.addEventListener('click', (e) => { if (e.target.closest('[data-ml-manage]')) { e.preventDefault(); openManager(app); } });
+  }
+
+  function openManager(app) {
+    let modal = $('.nx-modal', app);
+    if (!modal) modal = buildManager(app);
+    modal.nxOpen();
+  }
+
+  function buildManager(app) {
+    const modal = document.createElement('div');
+    modal.className = 'nx-modal';
+    modal.hidden = true;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'nx-mm-title');
+    modal.innerHTML = `
+      <div class="nx-modal-box">
+        <div class="nx-modal-h"><h2 id="nx-mm-title">★ My Leagues</h2><button type="button" class="nx-x" data-act="close" aria-label="Close">✕</button></div>
+        <div class="nx-modal-b">
+          <p class="nx-mm-help">Your own coach pages, one per league. They're saved only in this browser, with no account. Rename, reorder or remove them, then press <b>Save</b>.</p>
+          <div class="nx-mm-list"></div>
+          <form class="nx-mm-add"><input type="text" inputmode="url" placeholder="Paste a coach page link to add it…" aria-label="Coach page link"><button type="submit" class="nx-mbtn">Add</button></form>
+          <div class="nx-mm-msg" role="status" aria-live="polite"></div>
+
+          <div class="nx-mm-sec">
+            <h3>Backup &amp; restore</h3>
+            <p>Download a backup file of your leagues and settings (view, filters). Restore it on another browser or computer.</p>
+            <div class="row">
+              <button type="button" class="nx-mbtn" data-act="export">⬇ Download backup</button>
+              <button type="button" class="nx-mbtn" data-act="import">⬆ Restore from file…</button>
+              <input type="file" accept=".json,application/json" hidden>
+            </div>
+            <details><summary>…or paste backup text</summary>
+              <textarea rows="4" placeholder='{"app":"nhl94-its-in-the-script", …}' aria-label="Backup text"></textarea>
+              <button type="button" class="nx-mbtn" data-act="paste">Check pasted backup</button>
+            </details>
+            <div class="nx-mm-box" data-box="restore" hidden></div>
+          </div>
+
+          <div class="nx-mm-sec">
+            <h3>Clear history</h3>
+            <p>Remove your saved leagues, or wipe everything this script has saved in this browser.</p>
+            <div class="row">
+              <button type="button" class="nx-mbtn" data-act="clear">Clear My Leagues</button>
+              <button type="button" class="nx-mbtn" data-act="reset">Reset everything</button>
+            </div>
+            <div class="nx-mm-box danger" data-box="confirm" hidden></div>
+          </div>
+        </div>
+        <div class="nx-modal-f"><span class="nx-mm-dirty"></span>
+          <button type="button" class="nx-mbtn" data-act="close">Close</button>
+          <button type="button" class="nx-mbtn primary" data-act="save" disabled>Save</button>
+        </div>
+      </div>`;
+    app.appendChild(modal);
+
+    const list = $('.nx-mm-list', modal), msgEl = $('.nx-mm-msg', modal), dirtyEl = $('.nx-mm-dirty', modal);
+    const saveBtn = $('[data-act="save"]', modal), fileIn = $('input[type="file"]', modal), restoreBox = $('[data-box="restore"]', modal);
+    const confirmBox = $('[data-box="confirm"]', modal), addForm = $('.nx-mm-add', modal), addIn = $('input', addForm);
+    let draft = [], dirty = false, closeWarned = false, pending = null, lastFocus = null;
+
+    const msg = (text, kind = '') => { msgEl.textContent = text; msgEl.className = 'nx-mm-msg ' + kind; };
+    const setDirty = (d) => {
+      dirty = d; closeWarned = false; saveBtn.disabled = !d;
+      dirtyEl.className = 'nx-mm-dirty'; dirtyEl.textContent = d ? 'Unsaved changes' : '';
+    };
+    const renderList = () => {
+      list.innerHTML = draft.length ? draft.map((x, i) => `
+        <div class="nx-mm-row" data-i="${i}">
+          ${logoImg(x.team)}
+          <div class="info"><input value="${esc(x.label || defName(x))}" placeholder="${esc(defName(x))}" aria-label="Name for this league" data-f="label" title="Click to rename">
+            <small>${esc(mlSub(x) || x.path)}</small></div>
+          <div class="acts">
+            <button type="button" class="nx-ib" data-act="up" ${i === 0 ? 'disabled' : ''} aria-label="Move up" title="Move up">↑</button>
+            <button type="button" class="nx-ib" data-act="down" ${i === draft.length - 1 ? 'disabled' : ''} aria-label="Move down" title="Move down">↓</button>
+            <button type="button" class="nx-ib del" data-act="del" aria-label="Remove" title="Remove">✕</button>
+          </div>
+        </div>`).join('') : '<div class="nx-mm-empty">No leagues yet. Add one with <b>+ Add to My Leagues</b> on a coach page, or paste a coach page link below.</div>';
+    };
+    const showConfirm = (html) => { confirmBox.innerHTML = html; confirmBox.hidden = !html; };
+    const showRestore = (html) => { restoreBox.innerHTML = html; restoreBox.hidden = !html; };
+
+    modal.nxOpen = () => {
+      draft = myLeagues.all(); setDirty(false); msg(''); showConfirm(''); showRestore(''); pending = null;
+      renderList();
+      lastFocus = document.activeElement;
+      modal.hidden = false;
+      (addIn).focus();
+    };
+    const close = (force) => {
+      if (dirty && !force && !closeWarned) {
+        closeWarned = true;
+        dirtyEl.className = 'nx-mm-dirty warn';
+        dirtyEl.textContent = 'You have unsaved changes. Press Save, or Close again to discard them.';
+        return;
+      }
+      modal.hidden = true;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    };
+
+    list.addEventListener('input', (e) => {
+      const row = e.target.closest('.nx-mm-row');
+      if (row && e.target.dataset.f === 'label') {
+        const x = draft[+row.dataset.i], v = e.target.value.trim().slice(0, 80);
+        x.label = v === defName(x) ? '' : v; // empty label = use the team name
+        setDirty(true);
+      }
+    });
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const p = parseCoachUrl(addIn.value);
+      if (!p) return msg('That doesn\'t look like a coach page link. It should contain "coachpage.php?lg=…&team_ID=…".', 'err');
+      if (draft.some((x) => x.id === p.id)) return msg('That team is already in your list.', 'err');
+      msg('Looking up that coach page…');
+      let info = {};
+      try { info = await fetchCoachInfo(p); } catch (err) { info = {}; }
+      draft.push(cleanLeague({ ...p, ...info, label: '', addedAt: Date.now() }));
+      addIn.value = '';
+      renderList(); setDirty(true);
+      msg(info.team ? `Added ${fullTeamName(info.team)}${info.coach ? ' (' + info.coach + ')' : ''}. Press Save to keep it.`
+        : "Added, but I couldn't read the team name from that page. You can name it yourself. Press Save to keep it.", info.team ? 'ok' : 'err');
+    });
+
+    fileIn.addEventListener('change', async () => {
+      const f = fileIn.files && fileIn.files[0];
+      fileIn.value = '';
+      if (f) previewRestore(await f.text());
+    });
+
+    function previewRestore(text) {
+      showConfirm('');
+      try {
+        pending = readBackup(text);
+        const names = pending.leagues.map((x) => esc(mlTitle(x))).join(', ') || 'no leagues';
+        const when = pending.exportedAt ? new Date(pending.exportedAt).toLocaleString() : 'unknown date';
+        showRestore(`<b>Backup from ${esc(when)}</b><br>${pending.leagues.length} league${pending.leagues.length === 1 ? '' : 's'}: ${names}<br>
+          ${Object.keys(pending.prefs).length} saved settings. Restoring <b>replaces</b> your current ${myLeagues.all().length} league(s) and settings.
+          <div class="row"><button type="button" class="nx-mbtn primary" data-act="restore-yes">Restore</button><button type="button" class="nx-mbtn" data-act="restore-no">Cancel</button></div>`);
+      } catch (err) { pending = null; showRestore(''); msg(err.message, 'err'); }
+    }
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) return close(false);
+      const b = e.target.closest('[data-act]');
+      if (!b) return;
+      const act = b.dataset.act;
+      const row = b.closest('.nx-mm-row');
+      const i = row ? +row.dataset.i : -1;
+      if (act === 'close') close(false);
+      else if (act === 'up' && i > 0) { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; renderList(); setDirty(true); }
+      else if (act === 'down' && i < draft.length - 1) { [draft[i + 1], draft[i]] = [draft[i], draft[i + 1]]; renderList(); setDirty(true); }
+      else if (act === 'del') { const gone = draft.splice(i, 1)[0]; renderList(); setDirty(true); msg(`Removed ${mlTitle(gone)}. Press Save to confirm.`); }
+      else if (act === 'save') { myLeagues.save(draft); draft = myLeagues.all(); renderList(); setDirty(false); msg('Saved ✓', 'ok'); }
+      else if (act === 'export') {
+        if (dirty) return msg('Save your changes first, then download the backup.', 'err');
+        const blob = new Blob([JSON.stringify(buildBackup(), null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `nhl94-my-leagues-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        msg('Backup downloaded ✓ Keep that file somewhere safe.', 'ok');
+      }
+      else if (act === 'import') fileIn.click();
+      else if (act === 'paste') previewRestore($('textarea', modal).value);
+      else if (act === 'restore-no') { pending = null; showRestore(''); }
+      else if (act === 'restore-yes' && pending) {
+        myLeagues.save(pending.leagues);
+        clearPrefs();
+        Object.entries(pending.prefs).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch (err) {} });
+        pending = null; showRestore('');
+        draft = myLeagues.all(); renderList(); setDirty(false);
+        msg('Restored ✓ Reload the page to apply restored filters and view.', 'ok');
+      }
+      else if (act === 'clear') {
+        showRestore('');
+        showConfirm(`Remove all ${myLeagues.all().length} saved league(s) from this browser? This can't be undone unless you have a backup.
+          <div class="row"><button type="button" class="nx-mbtn danger" data-act="clear-yes">Yes, clear My Leagues</button><button type="button" class="nx-mbtn" data-act="confirm-no">Cancel</button></div>`);
+      }
+      else if (act === 'reset') {
+        showRestore('');
+        showConfirm(`Remove My Leagues <b>and</b> every setting this script saved (view choice, filters, collapsed groups)? The page will reload.
+          <div class="row"><button type="button" class="nx-mbtn danger" data-act="reset-yes">Yes, reset everything</button><button type="button" class="nx-mbtn" data-act="confirm-no">Cancel</button></div>`);
+      }
+      else if (act === 'confirm-no') showConfirm('');
+      else if (act === 'clear-yes') { myLeagues.save([]); draft = []; renderList(); setDirty(false); showConfirm(''); msg('My Leagues cleared.', 'ok'); }
+      else if (act === 'reset-yes') { myLeagues.save([]); clearPrefs(); location.reload(); }
+    });
+    modal.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close(false); }
+      if (e.key === 'Tab') { // keep focus inside the dialog
+        const f = $$('button:not(:disabled), input:not([type="file"]), textarea, summary, [href]', modal).filter((x) => x.offsetParent !== null);
+        if (!f.length) return;
+        if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+      }
+    });
+    return modal;
+  }
+
   function v1Mount(innerHtml) {
     const app = document.createElement('div');
     app.className = 'nx-root nx-v1';
@@ -587,6 +996,7 @@
     app.innerHTML = chrome.head + `<main class="nx-main">${innerHtml}${chrome.foot}</main>`;
     document.body.appendChild(app);
     v1WirePickers(app);
+    mlWire(app);
     // Collapsed menu (narrow windows): toggle, close on outside click or Escape.
     const menuBtn = $('.nx-menu-btn', app), menu = $('.nx-nav', app);
     const setMenu = (open) => { menu.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', String(open)); };
@@ -681,7 +1091,7 @@
                 ${rosterLink ? `<a class="nx-btn gold" href="${esc(rosterLink.href)}" target="_blank"><span>Roster Stats</span></a>` : ''}
                 ${standingsLink ? `<a class="nx-btn" href="${esc(standingsLink.href)}"><span>Standings</span></a>` : ''}
                 <a class="nx-btn" href="/html/matchup.php"><span>Head to Head</span></a>
-                <button type="button" class="nx-btn nx-pin"><span></span></button>
+                <button type="button" class="nx-btn nx-ml-add" hidden><span></span></button>
               </div>
             </div>
             ${rank ? `<div class="nx-hero-rank"><div class="big">${ordinal(rank.pos).toUpperCase()}</div><div class="lab">${esc(standings.division)} · ${esc(rank.pts)} pts</div></div>` : ''}
@@ -723,17 +1133,22 @@
     // ============================================================
     // 4. Behavior
     // ============================================================
-    // "My Team" pin: remembered so the home page can link straight back here.
-    const pin = $('.nx-pin', app);
-    const myTeamRec = { href: location.href, team: myTeam, coach: coachName, level: levelName, league: (leagueOpts.find((o) => o.sel) || {}).t || '' };
-    const isPinned = () => { const m = store.get('myteam', null); return !!m && m.href === location.href; };
-    const paintPin = () => {
-      pin.firstElementChild.textContent = isPinned() ? '★ My team' : '☆ Set as my team';
-      pin.setAttribute('aria-pressed', String(isPinned()));
-      pin.title = isPinned() ? 'This is your team. Click to unpin.' : 'Pin this team for a shortcut on the home page';
-    };
-    pin.addEventListener('click', () => { store.set('myteam', isPinned() ? null : myTeamRec); paintPin(); });
-    paintPin();
+    // "+ Add to My Leagues": saves this coach page to the user's league list.
+    const addBtn = $('.nx-ml-add', app);
+    const thisLeague = parseCoachUrl(HREF);
+    if (thisLeague) {
+      const rec = { ...thisLeague, team: myTeam, coach: coachName, league: (leagueOpts.find((o) => o.sel) || {}).t || '', label: '', addedAt: Date.now() };
+      const paintAdd = () => {
+        const on = myLeagues.has(rec.id);
+        addBtn.firstElementChild.textContent = on ? '✓ In My Leagues' : '+ Add to My Leagues';
+        addBtn.setAttribute('aria-pressed', String(on));
+        addBtn.title = on ? 'This team is in your My Leagues list. Click to remove it.' : 'Save this team to My Leagues (top bar) for one-click access';
+      };
+      addBtn.hidden = false;
+      addBtn.addEventListener('click', () => { myLeagues.toggle(rec); });
+      document.addEventListener('nx:myleagues', paintAdd);
+      paintAdd();
+    }
 
     if (!games.length) return app;
 
@@ -844,7 +1259,9 @@
   function renderHomeV1() {
     v1Setup();
     const H = scrapeHome();
-    const mine = store.get('myteam', null);
+    const lgNow = currentLg();
+    const mineIds = () => new Set(myLeagues.all().map((x) => x.id));
+    const myHereTeam = (myLeagues.all().find((x) => x.lg === lgNow && x.sublg === levelName) || {}).team || '';
 
     addCss(`
     .nx-v1 .nx-h-hero .nx-hero-in { align-items: center; }
@@ -856,6 +1273,14 @@
     .nx-h-mine .lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-gold); letter-spacing: .5px; margin-bottom: 10px; }
     .nx-star { font-family: var(--nx-ui); font-size: 11px; }
     .nx-h-mine .row { display: flex; align-items: center; gap: 12px; }
+    .nx-h-ml { display: flex; align-items: center; gap: 10px; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; color: #fff; }
+    .nx-h-ml:hover { background: rgba(255,255,255,.1); }
+    .nx-h-ml .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-h-ml > span:nth-child(2) { flex: 1; min-width: 0; }
+    .nx-h-ml .t { display: block; font: 600 16px var(--nx-cond); text-transform: uppercase; letter-spacing: .5px; line-height: 1.15; color: #fff; }
+    .nx-h-ml .c { display: block; font-size: 12px; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-ml .go { color: var(--nx-yellow, var(--nx-gold)); font-weight: 700; }
+    .nx-h-ml-manage { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.85) !important; text-decoration: underline !important; text-underline-offset: 2px; }
     .nx-h-mine img { width: 48px; height: 48px; image-rendering: pixelated; }
     .nx-h-mine .t { font-family: var(--nx-cond); font-size: 20px; font-weight: 600; text-transform: uppercase; line-height: 1.1; }
     .nx-h-mine .c { font-size: 12px; color: rgba(255,255,255,.75); }
@@ -998,7 +1423,7 @@
 
     const teamSide = (team, side, isWin) => {
       const info = teamInfo[team] || {};
-      const isMine = mine && info.href && mine.href === info.href;
+      const isMine = !!info.href && mineIds().has((parseCoachUrl(info.href) || {}).id);
       return `<a class="nx-h-tm ${side}${isWin ? ' win' : ''}${isMine ? ' mine' : ''}" href="${esc(info.href || '#')}">
         ${logoImg(team)}<span style="min-width:0"><div class="n">${esc(team)}</div><div class="c">${esc(info.coach || '')}</div></span></a>`;
     };
@@ -1012,19 +1437,22 @@
       </div>`).join('');
 
     const tabsHtml = H.levelTabs.map((t) =>
-      `<a class="nx-h-tab${t.sublg === H.scoresLevel ? ' on' : ''}" href="${esc(t.href)}">${esc(t.label)}${mine && mine.level === t.sublg ? '<span class="star">★</span>' : ''}</a>`).join('');
+      `<a class="nx-h-tab${t.sublg === H.scoresLevel ? ' on' : ''}" href="${esc(t.href)}">${esc(t.label)}${myLeagues.all().some((x) => x.lg === lgNow && x.sublg === t.sublg) ? '<span class="star" title="You have a team here">★</span>' : ''}</a>`).join('');
 
     const dl = H.dlGroups.map((g) => `<div class="nx-h-dl"><div class="nx-h-dl-h">${esc(g.name.toUpperCase())}</div>
       ${g.items.map((i) => `<a href="${esc(i.href)}"><span>${esc(i.label)}</span><span class="get">Download</span></a>`).join('')}</div>`).join('');
     const ra = (H.dlGroups.find((g) => /RetroArch/i.test(g.name)) || { items: [] }).items;
     const raBtn = (re, label) => { const i = ra.find((x) => re.test(x.label)); return i ? `<a class="nx-btn" href="${esc(i.href)}"><span>${label}</span></a>` : ''; };
 
-    const mineHtml = mine ? `
-      <div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY TEAM</div>
-        <div class="row"><img src="${esc(logo(mine.team, 100) || '')}" alt="" onerror="this.style.visibility='hidden'">
-          <div><div class="t">${esc(fullTeamName(mine.team))}</div><div class="c">Coach ${esc(mine.coach)} · ${esc(mine.level || '')}</div></div></div>
-        <a class="nx-btn gold" href="${esc(mine.href)}"><span>Open my schedule →</span></a>
-      </div>` : '';
+    // Hero card: the user's leagues (hidden until they add one).
+    const myLeaguesHtml = () => {
+      const l = myLeagues.all();
+      if (!l.length) return '';
+      return `<div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY LEAGUES</div>
+        ${l.slice(0, 5).map((x) => `<a class="nx-h-ml" href="${esc(x.path)}">${logoImg(x.team)}<span><span class="t">${esc(mlTitle(x))}</span><span class="c">${esc([x.sublg, x.league].filter(Boolean).join(' · '))}</span></span><span class="go">→</span></a>`).join('')}
+        <a class="nx-h-ml-manage" href="#" data-ml-manage>${l.length > 5 ? `+${l.length - 5} more · ` : ''}Manage</a>
+      </div>`;
+    };
 
     const leagueName0 = (leagueOpts.find((o) => o.sel) || {}).t || '';
     const app = v1Mount(`
@@ -1041,7 +1469,7 @@
               ${H.discord ? `<a class="nx-btn" href="${esc(H.discord)}" target="_blank"><span>Join Discord</span></a>` : ''}
             </div>
           </div>
-          ${mineHtml}
+          <div class="nx-h-mlwrap">${myLeaguesHtml()}</div>
         </div>
       </section>
 
@@ -1060,13 +1488,14 @@
               ${H.discord ? `<a class="nx-btn gold" href="${esc(H.discord)}" target="_blank"><span>Join us on Discord</span></a>` : ''}</div></div>` : ''}
         </div>
         <aside>
-          ${v1LeagueCard(mine && mine.level === levelName ? mine.team : '')}
+          ${v1LeagueCard(myHereTeam)}
           ${dl ? `<div class="nx-card"><div class="nx-card-h"><h2>Downloads</h2>${H.dlUpdated ? `<span class="nx-meta">${esc(H.dlUpdated)}</span>` : ''}</div>
             ${dl}${H.dlNote ? `<div class="nx-h-dl-note">${esc(H.dlNote)}</div>` : ''}</div>` : ''}
         </aside>
       </div>
     `);
     app.classList.add('nx-t94');
+    document.addEventListener('nx:myleagues', () => { const w = $('.nx-h-mlwrap', app); if (w) w.innerHTML = myLeaguesHtml(); });
     return app;
   }
 

@@ -46,7 +46,7 @@ The page remembers your choice. Press **Alt + Shift + V** to cycle through the v
 **Home page**
 
 - **Latest Scores** for each level, with team logos, coach names, the winner highlighted, OT tags and Box Score buttons.
-- **★ My Team:** pin your team from its coach page and it shows up on the home page with a one-click link to your schedule. Your level is starred in the score tabs.
+- **★ My Leagues:** in a lot of leagues? Press **+ Add to My Leagues** on each of your coach pages. They show up in the **★ My Leagues** menu in the top bar on every page and on the home page, and your levels get a ★ in the score tabs. Under **Manage**, you can rename or reorder them, add one by pasting a coach page link, **download a backup** (JSON), **restore** it on another browser, or **clear** your history. Nothing leaves your browser and no login is needed.
 - The RetroArch notice comes with direct Windows and Mac download buttons, and every league download is in one tidy list.
 - League card: switch season and level, and see every team with its coach.
 

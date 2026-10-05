@@ -43,7 +43,11 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
   3. **V1 building blocks:** `v1Setup()` adds fonts and base CSS once. `v1Chrome()` builds the ticker, top bar and footer. `v1LeagueCard(team)` builds the season/level pickers and the team and coach directory. `v1Mount(html)` wraps the chrome, appends the root (`.nx-root.nx-v1`) and wires the pickers.
   4. **Page renderers:** `renderCoachV1()`, `renderHomeV1()`, … Each returns its root element and is drawn lazily the first time its view is chosen.
   5. **`ALL_VERSIONS`:** each entry maps `{ pages: { coach: fn, home: fn } }`. The switcher only offers versions that have a renderer for the current page, and the newest is the default. The choice is stored in `nx:view` and is shared across pages.
-- Stored state (localStorage `nx:*`): `view`, `myteam` (pinned team `{href, team, coach, level, league}`), and `opp:/mode:/collapsed:<team_ID>` for coach page filters.
+- Stored state:
+  - **My Leagues** is kept in Tampermonkey storage (`GM_getValue/GM_setValue('myLeagues')`, shared by www and non-www). The list is `[{id:'lg:team_ID', lg, sublg, teamId, path, team, coach, league, label, addedAt}]`, and every entry goes through `cleanLeague()`/`parseCoachUrl()`. Without GM (i.e. `dev/preview.sh`) it falls back to localStorage `nx:gm:myLeagues`. Changes fire the `nx:myleagues` event, and the UI listens for it to repaint.
+  - **localStorage `nx:*`** holds `view` and `opp:/mode:/collapsed:<team_ID>` for coach page filters. The old `myteam` key is migrated into My Leagues on first read.
+  - **Backups:** `buildBackup()`/`readBackup()` use the JSON `{app:'nhl94-its-in-the-script', type:'backup', version:1, myLeagues, prefs}`. Restore only accepts valid coach page paths and `nx:` keys.
+- `dev/preview.sh` also takes `MYLEAGUES='[...]'` to seed leagues and `EXTRA_JS` to script interactions. `dev/out/mltest.js` is an example flow test, and its results go in the page title.
 - `dev/preview.sh [team_ID] [view] [w] [h]` downloads a live page, injects the script, and saves a screenshot to `dev/out/` with headless Chrome. Useful team IDs (lg=287, SNES-CD): 6714 Calgary (no games played), 6716 Los Angeles (has finished games).
 - `dev/local-loader.user.js` (gitignored) is the user's Tampermonkey loader. It `@require`s the local file, so their edits show up when they refresh the page.
 
@@ -62,7 +66,7 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 ## Every change: verify, then release
 
 1. `node --check nhl94-its-in-the-script.user.js`
-2. `dev/preview.sh 6716 <view>`, `dev/preview.sh 6714 <view>`, and `SUBLG=SNES-CD dev/preview.sh home <view>` (add `MYTEAM='{...}'` to test the pinned-team card). Then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
+2. `dev/preview.sh 6716 <view>`, `dev/preview.sh 6714 <view>`, and `SUBLG=SNES-CD dev/preview.sh home <view>` (add `MYLEAGUES='[...]'` to test My Leagues). Then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
 3. Raise `@version` in the header (semver: patch for fixes, minor for a new feature or design version, major for breaking changes). Tampermonkey only auto-updates when this number goes up.
 4. Commit with a clear message, then push to `main` only when the user asks. Auto-update reads `https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js`, and that only works while the repo is public.
 5. Tell the user what changed, what you verified (and what you didn't), and the new version number.
