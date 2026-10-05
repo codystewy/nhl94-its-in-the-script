@@ -64,6 +64,14 @@ You can also press **+ DM** next to any coach name on a coach page (on the team 
 
 Profile links (`discord.com/users/…`) aren't accepted, because Discord can't open a DM from a profile. Links saved before that rule show **Profile** instead of **Chat** until you change them.
 
+## League Discords
+
+Each league and level (the **League** and **Level** pickers at the top of a coach page) can have its own Discord server. Press **+ League Discord** next to the Level picker, paste the link and press **Enter**. After that the button turns blue, and one click takes you to the league's Discord.
+
+- Use a server invite (`discord.gg/…`) or a channel link (right-click the channel, **Copy Link**).
+- **This League** links the league and level on the page you're on. Each saved league opens its link so you can change or remove it.
+- **Clear All** forgets every league link.
+
 ## Colour Mode
 
 **Day** or **Night**. Press Enter or ← / → on the main menu to switch. It applies to every redesigned page.
