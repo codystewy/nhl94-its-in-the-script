@@ -27,13 +27,22 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 
 ## Repo map
 
-- `nhl94-its-in-the-script.user.js` is the single shipped file, in this order:
+- `nhl94-its-in-the-script.user.js` is the single shipped file. It runs on the whole domain (`@match *nhl94online.com/*`). Its parts, in order:
+  0. **Page router:** `PAGE` is `'home'`, `'coach'`, or `null`. With `null` the script exits and the original page is left untouched. `window.__nxTestPath` overrides the path, and only `dev/preview.sh` sets it.
   1. Helpers, the `TEAMS` map (city → logo slug + nickname; logos at `/images/gens/logos{20,100}/<slug>.png`)
-  2. **Scrape**: builds data from the original DOM (teamInfo, divisions, stats, checkpoint, profile, standings, champs, nav, games, groups). It's shared by all versions, so never change the original DOM here.
-  3. `renderV1()`, `renderV2()`, …: each one injects its own CSS via `addCss`, builds a root element with class `nx-root`, appends it to `<body>` and returns it. Each version is drawn lazily the first time it's selected.
-  4. The `VERSIONS` registry and the switcher. The newest entry is the default. The choice is stored as `nx:view`.
+  2. **Scrape:** shared site data runs on every page (teamInfo/divisions from the level sidebar, league/level options, champs, nav, footLinks), plus coach data (games, stats, standings…). Page-specific scrapes such as `scrapeHome()` run lazily. Never change the original DOM.
+  3. **V1 building blocks:** `v1Setup()` adds fonts and base CSS once. `v1Chrome()` builds the ticker, top bar and footer. `v1LeagueCard(team)` builds the season/level pickers and the team and coach directory. `v1Mount(html)` wraps the chrome, appends the root (`.nx-root.nx-v1`) and wires the pickers.
+  4. **Page renderers:** `renderCoachV1()`, `renderHomeV1()`, … Each returns its root element and is drawn lazily the first time its view is chosen.
+  5. **`ALL_VERSIONS`:** each entry maps `{ pages: { coach: fn, home: fn } }`. The switcher only offers versions that have a renderer for the current page, and the newest is the default. The choice is stored in `nx:view` and is shared across pages.
+- Stored state (localStorage `nx:*`): `view`, `myteam` (pinned team `{href, team, coach, level, league}`), and `opp:/mode:/collapsed:<team_ID>` for coach page filters.
 - `dev/preview.sh [team_ID] [view] [w] [h]` downloads a live page, injects the script, and saves a screenshot to `dev/out/` with headless Chrome. Useful team IDs (lg=287, SNES-CD): 6714 Calgary (no games played), 6716 Los Angeles (has finished games).
 - `dev/local-loader.user.js` (gitignored) is the user's Tampermonkey loader. It `@require`s the local file, so their edits show up when they refresh the page.
+
+## Redesigning another page
+
+1. Fetch it (`curl -sL <url>`) and study the DOM. Add a `PAGE` match for its path.
+2. Write `scrapeX()` and `renderXV1()` with `v1Setup()` + `v1Mount()`, so the page gets the same chrome. Prefix page-specific classes (e.g. `nx-h-` for home).
+3. Register it in `ALL_VERSIONS[v1].pages`, extend `dev/preview.sh` to fetch the page, and add it to the README's list of redesigned pages.
 
 ## Adding a new design version
 
@@ -44,7 +53,7 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 ## Every change: verify, then release
 
 1. `node --check nhl94-its-in-the-script.user.js`
-2. `dev/preview.sh 6716 <view>` and `dev/preview.sh 6714 <view>`, then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
+2. `dev/preview.sh 6716 <view>`, `dev/preview.sh 6714 <view>`, and `SUBLG=SNES-CD dev/preview.sh home <view>` (add `MYTEAM='{...}'` to test the pinned-team card). Then **look at the screenshots** (Read the PNG). Check the page title for `SCRIPT ERROR`. Also check the Classic view still shows the original page with the switcher.
 3. Raise `@version` in the header (semver: patch for fixes, minor for a new feature or design version, major for breaking changes). Tampermonkey only auto-updates when this number goes up.
 4. Commit with a clear message, then push to `main` only when the user asks. Auto-update reads `https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js`, and that only works while the repo is public.
 5. Tell the user what changed, what you verified (and what you didn't), and the new version number.

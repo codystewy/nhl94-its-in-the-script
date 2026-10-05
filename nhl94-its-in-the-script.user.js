@@ -1,17 +1,17 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.0.0
-// @description  Redesigns nhl94online.com coach pages: coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
+// @version      1.1.0
+// @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
 // @supportURL   https://github.com/codystewy/nhl94-its-in-the-script/issues
 // @updateURL    https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js
 // @downloadURL  https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/main/nhl94-its-in-the-script.user.js
-// @match        https://nhl94online.com/html/coachpage.php*
-// @match        http://nhl94online.com/html/coachpage.php*
-// @match        https://www.nhl94online.com/html/coachpage.php*
-// @match        http://www.nhl94online.com/html/coachpage.php*
+// @match        https://nhl94online.com/*
+// @match        http://nhl94online.com/*
+// @match        https://www.nhl94online.com/*
+// @match        http://www.nhl94online.com/*
 // @grant        GM_addStyle
 // @run-at       document-idle
 // ==/UserScript==
@@ -35,6 +35,13 @@
     get(k, d) { try { const v = localStorage.getItem('nx:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('nx:' + k, JSON.stringify(v)); } catch (e) {} },
   };
+  // Which page are we on? Pages without a redesign are left untouched.
+  const PATH = window.__nxTestPath || location.pathname; // __nxTestPath: set by dev/preview.sh only
+  const PAGE = /\/html\/coachpage\.php$/i.test(PATH) ? 'coach'
+    : /^\/(index\.php)?$/i.test(PATH) ? 'home'
+    : null;
+  if (!PAGE) return;
+
   const params = new URLSearchParams(location.search);
   const pageKey = params.get('team_ID') || location.search;
 
@@ -160,6 +167,12 @@
     };
   }) : [];
 
+  // Site footer links
+  const footLinks = $$('a.link5').filter((a) => !a.closest('#nav') && a.closest('table') && /Homepage|About|Rules|FAQs|Contact/i.test(a.closest('table').textContent))
+    .map((a) => ({ text: norm(a.textContent), href: a.getAttribute('href') }))
+    .filter((l, i, arr) => l.text && arr.findIndex((x) => x.text === l.text) === i && !/NHL94\.com|NHL94 Forums/i.test(l.text));
+
+  // ---------- Coach page ----------
   // Schedule
   const sched = leafTables().find((t) => /^Gm Away @ Home SCORE/i.test(firstRowText(t)));
   const games = sched ? [...sched.rows].slice(1).filter((r) => r.cells.length >= 7).map((r) => {
@@ -236,7 +249,10 @@
   // ============================================================
   // VERSION 1 — "Rink Night": dark NHL 26 broadcast look with 16-bit touches
   // ============================================================
-  function renderV1() {
+  let v1Ready = false;
+  function v1Setup() {
+    if (v1Ready) return;
+    v1Ready = true;
     const fonts = document.createElement('link');
     fonts.rel = 'stylesheet';
     fonts.href = 'https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap';
@@ -251,19 +267,19 @@
       --nx-px: "Press Start 2P", monospace; --nx-cond: Oswald, "Arial Narrow", sans-serif; --nx-ui: Inter, "Segoe UI", system-ui, sans-serif;
     }
 
-    #nx-app, #nx-app * { box-sizing: border-box; }
-    #nx-app { font-family: var(--nx-ui); font-size: 14px; color: var(--nx-text); min-height: 100vh; line-height: 1.4; text-align: left;
+    .nx-v1, .nx-v1 * { box-sizing: border-box; }
+    .nx-v1 { font-family: var(--nx-ui); font-size: 14px; color: var(--nx-text); min-height: 100vh; line-height: 1.4; text-align: left;
       background:
         radial-gradient(1200px 500px at 15% -10%, rgba(200,16,46,.22), transparent 60%),
         radial-gradient(900px 400px at 100% 0%, rgba(241,190,72,.08), transparent 60%),
         linear-gradient(180deg, #0d1017 0%, var(--nx-bg) 400px); }
-    #nx-app a { color: inherit; text-decoration: none; }
-    #nx-app img { border: 0; }
-    #nx-app select { font: inherit; font-size: 13px; color: var(--nx-text); background-color: var(--nx-card2); border: 1px solid var(--nx-line2);
+    .nx-v1 a { color: inherit; text-decoration: none; }
+    .nx-v1 img { border: 0; }
+    .nx-v1 select { font: inherit; font-size: 13px; color: var(--nx-text); background-color: var(--nx-card2); border: 1px solid var(--nx-line2);
       border-radius: 6px; padding: 6px 28px 6px 10px; cursor: pointer; appearance: none; -webkit-appearance: none;
       background-image: linear-gradient(45deg, transparent 50%, var(--nx-gold) 50%), linear-gradient(135deg, var(--nx-gold) 50%, transparent 50%);
       background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
-    #nx-app select:focus-visible, #nx-app button:focus-visible, #nx-app a:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
+    .nx-v1 select:focus-visible, .nx-v1 button:focus-visible, .nx-v1 a:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
 
     /* ---------- Ticker ---------- */
     .nx-ticker { display: flex; align-items: center; height: 30px; background: #000; border-bottom: 1px solid var(--nx-line); overflow: hidden; font-size: 12px; }
@@ -346,6 +362,8 @@
     .nx-btn:hover { background: var(--nx-red-d); border-color: var(--nx-gold); }
     .nx-btn.gold { background: var(--nx-gold); border-color: var(--nx-gold); color: #111 !important; }
     .nx-btn.gold:hover { background: #ffd36b; }
+    .nx-btn.nx-pin[aria-pressed="true"] { border-color: var(--nx-gold); color: var(--nx-gold) !important; }
+    button.nx-btn { font-family: var(--nx-cond); }
 
     /* ---------- Cards ---------- */
     .nx-card { background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: 12px; overflow: clip; }
@@ -483,12 +501,10 @@
     @media (prefers-reduced-motion: reduce) { .nx-foot .nx-px { animation: none; } }
     `;
     addCss(css);
+  }
 
-    // ============================================================
-    // 3. Render
-    // ============================================================
-    const gfN = parseInt(stats.gf, 10) || 0, gaN = parseInt(stats.ga, 10) || 0, diff = gfN - gaN;
-
+  // Shared V1 site chrome: champions ticker + sticky top bar, and the footer.
+  function v1Chrome() {
     const tickerItems = champs.map((c) =>
       `<span class="nx-ticker-item">${c.img ? `<img src="${esc(c.img)}" alt="">` : ''}${esc(c.level)} <a href="${esc(c.href)}"><b>${esc(c.coach)}</b></a></span>`).join('');
 
@@ -498,6 +514,59 @@
         : `<a href="${esc(s.href)}"${s.target ? ` target="${esc(s.target)}"` : ''}>${esc(s.text)}</a>`).join('')}</div>` : '';
       return `<div><a href="${esc(n.href)}"${n.target ? ` target="${esc(n.target)}"` : ''}>${esc(n.text)}${n.sub.length ? '&nbsp;▾' : ''}</a>${sub}</div>`;
     }).join('');
+
+    return {
+      head: `
+      ${champs.length ? `<div class="nx-ticker"><div class="nx-ticker-tag">${esc((champTitle || 'Champions').toUpperCase())}</div>
+        <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
+      <header class="nx-top">
+        <a class="nx-brand" href="/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
+        <nav class="nx-nav">${navHtml}</nav>
+      </header>`,
+      foot: `<footer class="nx-foot">
+        <span class="nx-px">PRESS START</span>
+        <nav class="nx-foot-links">${footLinks.map((l) => `<a href="${esc(l.href)}">${esc(l.text)}</a>`).join('')}</nav>
+        <span>NHL94Online.com · Classic '94</span>
+      </footer>`,
+    };
+  }
+
+  // League card: season + level pickers and every team with its coach.
+  function v1LeagueCard(highlightTeam) {
+    if (!divisions.length && !leagueOpts.length) return '';
+    return `
+      <div class="nx-card"><div class="nx-card-h"><h2>League</h2>${levelName ? `<span class="nx-meta">${esc(levelName)}</span>` : ''}</div>
+        ${leagueOpts.length ? `<div class="nx-level">Season <select class="nx-lg-sel">${leagueOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
+        ${levelOpts.length ? `<div class="nx-level">Level <select class="nx-level-sel">${levelOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
+        ${divisions.map((d) => `<div class="nx-dir"><div class="nx-dir-h">${esc(d.name.toUpperCase())}</div>
+          ${d.teams.map((t) => `<a class="${t === highlightTeam ? 'me' : ''}" href="${esc(teamInfo[t].href)}">${logoImg(t)}<span class="n">${esc(t)}</span><span class="c">${esc(teamInfo[t].coach)}</span></a>`).join('')}
+        </div>`).join('')}
+        <div style="height:8px"></div>
+      </div>`;
+  }
+
+  // Wire the season / level pickers (same URLs the original selects used).
+  function v1WirePickers(app) {
+    $$('.nx-lg-sel', app).forEach((el) => el.addEventListener('change', () => { location.href = '?lg=' + encodeURIComponent(el.value); }));
+    $$('.nx-level-sel', app).forEach((el) => el.addEventListener('change', () => {
+      location.href = '?lg=' + encodeURIComponent(params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '') + '&sublg=' + encodeURIComponent(el.value);
+    }));
+  }
+
+  function v1Mount(innerHtml) {
+    const app = document.createElement('div');
+    app.className = 'nx-root nx-v1';
+    const chrome = v1Chrome();
+    app.innerHTML = chrome.head + `<main class="nx-main">${innerHtml}${chrome.foot}</main>`;
+    document.body.appendChild(app);
+    v1WirePickers(app);
+    return app;
+  }
+
+  // ---------- V1 · Coach page ----------
+  function renderCoachV1() {
+    v1Setup();
+    const gfN = parseInt(stats.gf, 10) || 0, gaN = parseInt(stats.ga, 10) || 0, diff = gfN - gaN;
 
     const streakShort = stats.streak.replace(/^Won\s*/i, 'W').replace(/^Lost\s*/i, 'L').replace(/^Tied?\s*/i, 'T');
     const statCells = [
@@ -567,28 +636,7 @@
       <div class="nx-card"><div class="nx-card-h"><h2>Coach Profile</h2></div>
         <div class="nx-prof">${profile.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div></div>` : '';
 
-    const dirHtml = divisions.length ? `
-      <div class="nx-card"><div class="nx-card-h"><h2>League</h2></div>
-        ${leagueOpts.length ? `<div class="nx-level">Season <select id="nx-lg">${leagueOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
-        ${levelOpts.length ? `<div class="nx-level">Level <select id="nx-level">${levelOpts.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>` : ''}
-        ${divisions.map((d) => `<div class="nx-dir"><div class="nx-dir-h">${esc(d.name.toUpperCase())}</div>
-          ${d.teams.map((t) => `<a class="${t === myTeam ? 'me' : ''}" href="${esc(teamInfo[t].href)}">${logoImg(t)}<span class="n">${esc(t)}</span><span class="c">${esc(teamInfo[t].coach)}</span></a>`).join('')}
-        </div>`).join('')}
-        <div style="height:8px"></div>
-      </div>` : '';
-
-    const app = document.createElement('div');
-    app.id = 'nx-app';
-    app.className = 'nx-root';
-    app.innerHTML = `
-      ${champs.length ? `<div class="nx-ticker"><div class="nx-ticker-tag">${esc((champTitle || 'Champions').toUpperCase())}</div>
-        <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
-      <header class="nx-top">
-        <a class="nx-brand" href="http://www.nhl94online.com/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
-        <nav class="nx-nav">${navHtml}</nav>
-      </header>
-
-      <main class="nx-main">
+    const app = v1Mount(`
         <section class="nx-hero">
           <div class="nx-hero-in">
             <div class="nx-hero-logo">${bigLogo ? `<img src="${esc(bigLogo.src)}" alt="">` : ''}</div>
@@ -600,6 +648,7 @@
                 ${rosterLink ? `<a class="nx-btn gold" href="${esc(rosterLink.href)}" target="_blank"><span>Roster Stats</span></a>` : ''}
                 ${standingsLink ? `<a class="nx-btn" href="${esc(standingsLink.href)}"><span>Standings</span></a>` : ''}
                 <a class="nx-btn" href="/html/matchup.php"><span>Head to Head</span></a>
+                <button type="button" class="nx-btn nx-pin"><span></span></button>
               </div>
             </div>
             ${rank ? `<div class="nx-hero-rank"><div class="big">${ordinal(rank.pos).toUpperCase()}</div><div class="lab">${esc(standings.division)} · ${esc(rank.pts)} pts</div></div>` : ''}
@@ -632,22 +681,26 @@
           <aside>
             ${standingsHtml}
             ${profileHtml}
-            ${dirHtml}
+            ${v1LeagueCard(myTeam)}
           </aside>
         </div>
 
-        <footer class="nx-foot"><span class="nx-px">PRESS START</span><span>NHL94Online.com · Classic '94</span></footer>
-      </main>
-    `;
-    document.body.appendChild(app);
+    `);
 
     // ============================================================
     // 4. Behavior
     // ============================================================
-    const lg = $('#nx-lg', app);
-    if (lg) lg.addEventListener('change', () => { location.href = '?lg=' + encodeURIComponent(lg.value); });
-    const lvl = $('#nx-level', app);
-    if (lvl) lvl.addEventListener('change', () => { location.href = '?lg=' + encodeURIComponent(params.get('lg') || '') + '&sublg=' + encodeURIComponent(lvl.value); });
+    // "My Team" pin: remembered so the home page can link straight back here.
+    const pin = $('.nx-pin', app);
+    const myTeamRec = { href: location.href, team: myTeam, coach: coachName, level: levelName, league: (leagueOpts.find((o) => o.sel) || {}).t || '' };
+    const isPinned = () => { const m = store.get('myteam', null); return !!m && m.href === location.href; };
+    const paintPin = () => {
+      pin.firstElementChild.textContent = isPinned() ? '★ My team' : '☆ Set as my team';
+      pin.setAttribute('aria-pressed', String(isPinned()));
+      pin.title = isPinned() ? 'This is your team. Click to unpin.' : 'Pin this team for a shortcut on the home page';
+    };
+    pin.addEventListener('click', () => { store.set('myteam', isPinned() ? null : myTeamRec); paintPin(); });
+    paintPin();
 
     if (!games.length) return app;
 
@@ -701,16 +754,221 @@
     return app;
   }
 
+  // ---------- Home page data ----------
+  function scrapeHome() {
+    const imgP = (alt) => { const i = $$('img').find((x) => new RegExp(alt, 'i').test(x.alt || '')); return i ? i.closest('td') : null; };
+
+    // Welcome copy: the left-aligned paragraphs next to the "Welcome" banner (site's own markup, kept as-is)
+    const welcomeTd = imgP('^Welcome to the Online');
+    const welcome = welcomeTd ? $$('p[align="left"]', welcomeTd).map((p) => p.innerHTML) : [];
+    const discord = $$('a[href*="discord.gg"]')[0];
+
+    // Notes box
+    const notesTd = imgP('^Notes$');
+    const notes = notesTd ? $$('p', notesTd).map((p) => norm(p.textContent)).filter((t) => t.length > 20).join(' ') : '';
+
+    // Latest 10 scores for the selected level
+    const scoreTable = leafTables().find((t) => /^\S+ Away @ Home Timestamp$/.test(firstRowText(t)));
+    const scoresLevel = scoreTable ? norm(scoreTable.rows[0].cells[0].textContent) : '';
+    const scores = scoreTable ? [...scoreTable.rows].slice(1).filter((r) => r.cells.length >= 5).map((r) => {
+      const a = r.cells[0].querySelector('a');
+      const txt = norm(r.cells[0].textContent);
+      const m = txt.match(/^(\d+)\s*-\s*(\d+)\s+([A-Za-z.]+)?\s*(OT)?/i) || [];
+      const away = norm(r.cells[1].textContent), home = norm(r.cells[3].textContent);
+      const hi = +m[1] || 0, lo = +m[2] || 0, abbr = m[3] || '';
+      let winner = '';
+      if (abbr && hi !== lo) winner = abbrScore(abbr, home) > abbrScore(abbr, away) ? home : away;
+      return {
+        away, home, winner, ot: !!m[4] || /\bOT\b/.test(txt), href: a ? a.href : '', time: norm(r.cells[4].textContent),
+        awayG: winner === home ? lo : hi, homeG: winner === home ? hi : lo,
+      };
+    }) : [];
+    const levelTabs = $$('a[href*="index.php?lg="]').map((a) => {
+      const u = new URL(a.href, location.href);
+      return { label: norm(a.textContent), href: a.href, sublg: u.searchParams.get('sublg') };
+    }).filter((t, i, arr) => t.sublg && arr.findIndex((x) => x.sublg === t.sublg) === i);
+
+    // Downloads, grouped by their section header rows
+    const dlGroups = [];
+    leafTables().filter((t) => t.querySelector('a[href*="/downloads/"]')).forEach((t) => {
+      let g = null;
+      [...t.rows].forEach((r) => {
+        const link = r.querySelector('a[href*="/downloads/"]');
+        if (!link) { const h = norm(r.textContent); if (h) { g = { name: h, items: [] }; dlGroups.push(g); } return; }
+        if (!g) { g = { name: 'Downloads', items: [] }; dlGroups.push(g); }
+        g.items.push({ label: norm(r.cells[0].textContent), href: link.href });
+      });
+    });
+    const dlNote = norm(($$('.small_red').find((s) => /RetroArch packages/i.test(s.textContent)) || {}).textContent || '');
+    const dlUpdated = norm(($$('.text_red').find((s) => /Updated/i.test(s.textContent)) || {}).textContent || '').replace(/\*/g, '');
+    const gettingStarted = $$('a').find((a) => /getting-started\.php/.test(a.getAttribute('href') || ''));
+
+    return { welcome, discord: discord ? discord.href : '', notes, scores, scoresLevel, levelTabs, dlGroups, dlNote, dlUpdated,
+      gettingStarted: gettingStarted ? gettingStarted.href : '/html/getting-started.php' };
+  }
+
+  // ---------- V1 · Home page ----------
+  function renderHomeV1() {
+    v1Setup();
+    const H = scrapeHome();
+    const mine = store.get('myteam', null);
+
+    addCss(`
+    .nx-v1 .nx-h-hero .nx-hero-in { align-items: center; }
+    .nx-h-word { margin: 12px 0 6px; font-family: var(--nx-px); font-size: clamp(22px, 4vw, 40px); line-height: 1.15; color: #fff;
+      text-shadow: 4px 4px 0 var(--nx-red-d), 0 0 24px rgba(241,190,72,.25); letter-spacing: 1px; }
+    .nx-h-word span { color: var(--nx-gold); }
+    .nx-h-sub { font-size: 15px; color: rgba(255,255,255,.85); max-width: 560px; }
+    .nx-h-mine { flex: none; width: 290px; margin-right: 110px; padding: 14px; background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; }
+    .nx-h-mine .lab { font-family: var(--nx-px); font-size: 7px; color: var(--nx-gold); letter-spacing: .5px; margin-bottom: 10px; }
+    .nx-star { font-family: var(--nx-ui); font-size: 11px; }
+    .nx-h-mine .row { display: flex; align-items: center; gap: 12px; }
+    .nx-h-mine img { width: 48px; height: 48px; image-rendering: pixelated; }
+    .nx-h-mine .t { font-family: var(--nx-cond); font-size: 20px; font-weight: 600; text-transform: uppercase; line-height: 1.1; }
+    .nx-h-mine .c { font-size: 12px; color: rgba(255,255,255,.75); }
+    .nx-h-mine .nx-btn { margin-top: 12px; }
+    .nx-h-mine p { margin: 0; font-size: 13px; color: rgba(255,255,255,.8); }
+    @media (max-width: 900px) { .nx-h-mine { margin-right: 0; width: 100%; } .nx-v1 .nx-h-hero .nx-hero-in { flex-wrap: wrap; } }
+
+    .nx-h-note { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; padding: 12px 16px; background: var(--nx-card);
+      border: 1px solid var(--nx-line); border-left: 4px solid var(--nx-gold); border-radius: 10px; }
+    .nx-h-note .tag { font-family: var(--nx-px); font-size: 8px; color: #111; background: var(--nx-gold); padding: 6px 8px; border-radius: 3px; }
+    .nx-h-note p { margin: 0; flex: 1; min-width: 240px; font-size: 13px; color: var(--nx-text); }
+    .nx-h-note .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .nx-h-tabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-tab { font: 600 12px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; padding: 5px 11px; border-radius: 4px;
+      color: var(--nx-mute); background: var(--nx-bg2); border: 1px solid var(--nx-line2); }
+    .nx-h-tab:hover { color: #fff; border-color: var(--nx-gold); }
+    .nx-h-tab.on { color: #fff; background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-h-tab .star { color: var(--nx-gold); margin-left: 4px; }
+
+    .nx-h-game { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 9px 16px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-game:nth-child(even) { background: rgba(0,0,0,.18); }
+    .nx-h-game:hover { background: rgba(241,190,72,.07); }
+    .nx-h-tm { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--nx-mute); }
+    .nx-h-tm.away { flex-direction: row-reverse; text-align: right; }
+    .nx-h-tm img, .nx-h-tm .nx-logo { width: 28px; height: 28px; image-rendering: pixelated; flex: none; }
+    .nx-h-tm .n { font-family: var(--nx-cond); font-size: 16px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; line-height: 1.15;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-tm .c { font-size: 11px; color: var(--nx-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nx-h-tm.win { color: #fff; }
+    .nx-h-tm.win .n { font-weight: 700; }
+    .nx-h-tm.win .c { color: var(--nx-gold); }
+    .nx-h-tm.mine .n::after { content: " ★"; color: var(--nx-gold); }
+    .nx-h-score { display: flex; align-items: center; gap: 6px; font-family: var(--nx-px); font-size: 15px; color: var(--nx-mute); padding: 6px 10px;
+      background: #0b0d12; border: 1px solid var(--nx-line2); border-radius: 4px; min-width: 96px; justify-content: center; }
+    .nx-h-score b { color: #fff; font-weight: 400; }
+    .nx-h-score .ot { font-family: var(--nx-cond); font-size: 10px; letter-spacing: 1px; color: #111; background: var(--nx-gold); padding: 1px 4px; border-radius: 2px; margin-left: 2px; }
+    .nx-h-meta { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+    .nx-h-meta .time { font-size: 11px; color: var(--nx-mute); text-align: right; white-space: nowrap; }
+    @media (max-width: 760px) { .nx-h-game { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); } .nx-h-meta { grid-column: 1 / -1; justify-content: center; } }
+
+    .nx-h-copy { padding: 6px 18px 16px; font-size: 14px; line-height: 1.6; color: #d6dbe5; }
+    .nx-h-copy p { margin: 12px 0 0; }
+    .nx-h-copy p a { color: var(--nx-gold) !important; text-decoration: underline !important; text-underline-offset: 2px; }
+    .nx-h-copy .nx-btn { margin-top: 16px; }
+
+    .nx-h-dl-h { padding: 12px 16px 6px; font-family: var(--nx-px); font-size: 8px; color: var(--nx-gold); letter-spacing: .5px; }
+    .nx-h-dl a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--nx-line); }
+    .nx-h-dl a:hover { background: var(--nx-card2); }
+    .nx-h-dl a:hover .get { background: var(--nx-red); color: #fff; border-color: var(--nx-red); }
+    .nx-h-dl .get { flex: none; font: 600 11px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; padding: 3px 9px; border-radius: 3px;
+      color: var(--nx-gold); border: 1px solid rgba(241,190,72,.45); }
+    .nx-h-dl-note { padding: 10px 16px 14px; font-size: 12px; color: var(--nx-mute); }
+    .nx-foot-links { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; }
+    .nx-foot-links a:hover { color: var(--nx-gold); }
+    `);
+
+    const teamSide = (team, side, isWin) => {
+      const info = teamInfo[team] || {};
+      const isMine = mine && info.href && mine.href === info.href;
+      return `<a class="nx-h-tm ${side}${isWin ? ' win' : ''}${isMine ? ' mine' : ''}" href="${esc(info.href || '#')}">
+        ${logoImg(team)}<span style="min-width:0"><div class="n">${esc(team)}</div><div class="c">${esc(info.coach || '')}</div></span></a>`;
+    };
+
+    const scoresHtml = H.scores.map((g) => `
+      <div class="nx-h-game">
+        ${teamSide(g.away, 'away', g.winner === g.away)}
+        <div class="nx-h-score">${g.winner === g.away ? `<b>${g.awayG}</b>` : g.awayG}<span>-</span>${g.winner === g.home ? `<b>${g.homeG}</b>` : g.homeG}${g.ot ? '<span class="ot">OT</span>' : ''}</div>
+        ${teamSide(g.home, 'home', g.winner === g.home)}
+        <div class="nx-h-meta"><span class="time">${esc(g.time)}</span>${g.href ? `<a class="nx-go box" href="${esc(g.href)}" target="_blank"><span>Box Score</span></a>` : ''}</div>
+      </div>`).join('');
+
+    const tabsHtml = H.levelTabs.map((t) =>
+      `<a class="nx-h-tab${t.sublg === H.scoresLevel ? ' on' : ''}" href="${esc(t.href)}">${esc(t.label)}${mine && mine.level === t.sublg ? '<span class="star">★</span>' : ''}</a>`).join('');
+
+    const dl = H.dlGroups.map((g) => `<div class="nx-h-dl"><div class="nx-h-dl-h">${esc(g.name.toUpperCase())}</div>
+      ${g.items.map((i) => `<a href="${esc(i.href)}"><span>${esc(i.label)}</span><span class="get">Download</span></a>`).join('')}</div>`).join('');
+    const ra = (H.dlGroups.find((g) => /RetroArch/i.test(g.name)) || { items: [] }).items;
+    const raBtn = (re, label) => { const i = ra.find((x) => re.test(x.label)); return i ? `<a class="nx-btn" href="${esc(i.href)}"><span>${label}</span></a>` : ''; };
+
+    const mineHtml = mine ? `
+      <div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY TEAM</div>
+        <div class="row"><img src="${esc(logo(mine.team, 100) || '')}" alt="" onerror="this.style.visibility='hidden'">
+          <div><div class="t">${esc(fullTeamName(mine.team))}</div><div class="c">Coach ${esc(mine.coach)} · ${esc(mine.level || '')}</div></div></div>
+        <a class="nx-btn gold" href="${esc(mine.href)}"><span>Open my schedule →</span></a>
+      </div>` : `
+      <div class="nx-h-mine"><div class="lab"><span class="nx-star">★</span> MY TEAM</div>
+        <p>Open your coach page and press <b>☆ Set as my team</b>. Your schedule will be one click away from here.</p>
+      </div>`;
+
+    const leagueName0 = (leagueOpts.find((o) => o.sel) || {}).t || '';
+    const app = v1Mount(`
+      <section class="nx-hero nx-h-hero">
+        <div class="nx-hero-in">
+          <div class="nx-hero-txt">
+            <div class="nx-eyebrow">${esc(leagueName0.toUpperCase() || 'CLASSIC \'94')}</div>
+            <div class="nx-h-word">NHL'94 <span>ONLINE</span></div>
+            <div class="nx-h-sub">Play the classic online against coaches from across North America.</div>
+            <div class="nx-actions">
+              <a class="nx-btn gold" href="${esc(H.gettingStarted)}"><span>Getting Started</span></a>
+              <a class="nx-btn" href="/html/about.php"><span>About</span></a>
+              <a class="nx-btn" href="/html/rules.php"><span>Rules</span></a>
+              ${H.discord ? `<a class="nx-btn" href="${esc(H.discord)}" target="_blank"><span>Join Discord</span></a>` : ''}
+            </div>
+          </div>
+          ${mineHtml}
+        </div>
+      </section>
+
+      ${H.notes ? `<div class="nx-h-note"><span class="tag">NOTE</span><p>${esc(H.notes)}</p>
+        <div class="acts">${raBtn(/Windows/i, 'RetroArch · Windows')}${raBtn(/Mac/i, 'RetroArch · Mac')}</div></div>` : ''}
+
+      <div class="nx-grid">
+        <div>
+          <div class="nx-card">
+            <div class="nx-card-h"><h2>Latest Scores</h2><span class="nx-meta">${esc(H.scoresLevel)} · last ${H.scores.length}</span></div>
+            ${tabsHtml ? `<div class="nx-h-tabs">${tabsHtml}</div>` : ''}
+            ${scoresHtml || '<div class="nx-empty">No games logged yet.</div>'}
+          </div>
+          ${H.welcome.length ? `<div class="nx-card"><div class="nx-card-h"><h2>Welcome</h2></div>
+            <div class="nx-h-copy">${H.welcome.map((p) => `<p>${p}</p>`).join('')}
+              ${H.discord ? `<a class="nx-btn gold" href="${esc(H.discord)}" target="_blank"><span>Join us on Discord</span></a>` : ''}</div></div>` : ''}
+        </div>
+        <aside>
+          ${v1LeagueCard(mine && mine.level === levelName ? mine.team : '')}
+          ${dl ? `<div class="nx-card"><div class="nx-card-h"><h2>Downloads</h2>${H.dlUpdated ? `<span class="nx-meta">${esc(H.dlUpdated)}</span>` : ''}</div>
+            ${dl}${H.dlNote ? `<div class="nx-h-dl-note">${esc(H.dlNote)}</div>` : ''}</div>` : ''}
+        </aside>
+      </div>
+    `);
+    return app;
+  }
+
   // ============================================================
   // Version registry + View switcher
   // ------------------------------------------------------------
-  // To add a new design: write renderV2() (returns its root element with class
-  // "nx-root") and add it here. The newest entry is the default view.
+  // Each version maps page -> renderer. A renderer returns its root element
+  // (class "nx-root"). To redesign another page, add it to PAGE detection at the
+  // top and give it a renderer here. The newest version is the default view.
   // ============================================================
-  const VERSIONS = [
+  const ALL_VERSIONS = [
     { id: 'classic', label: 'Classic', title: 'Original nhl94online.com page' },
-    { id: 'v1', label: 'V1', title: 'V1 · Rink Night', render: renderV1 },
+    { id: 'v1', label: 'V1', title: 'V1 · Rink Night', pages: { coach: renderCoachV1, home: renderHomeV1 } },
   ];
+  // Only offer versions that have a design for this page.
+  const VERSIONS = ALL_VERSIONS.filter((v) => !v.pages || v.pages[PAGE]).map((v) => ({ ...v, render: v.pages && v.pages[PAGE] }));
   const DEFAULT_VIEW = VERSIONS[VERSIONS.length - 1].id;
 
   addCss(`

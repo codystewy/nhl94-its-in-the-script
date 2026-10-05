@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Render a real nhl94online.com coach page with the userscript injected, using headless Chrome.
-# Usage: dev/preview.sh [team_ID] [view] [width] [height]
-#   team_ID  defaults to 6714 (Calgary, SNES-CD, Classic '94-2026 Fall)
+# Usage: dev/preview.sh [team_ID|home] [view] [width] [height]
+#   team_ID  a coach page team_ID (default 6714 = Calgary, SNES-CD, Classic '94-2026 Fall), or "home"
+#            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
+#   MYTEAM='{"href":"...","team":"Calgary","coach":"Stewy","level":"SNES-CD"}' pre-pins a team
 # Output: dev/out/preview-<team_ID>-<view>.png
 set -euo pipefail
 
@@ -18,15 +20,22 @@ OUT="$ROOT/dev/out"
 mkdir -p "$OUT"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
-curl -sL "https://nhl94online.com/html/coachpage.php?lg=$LG&sublg=$SUBLG&team_ID=$TEAM" -o "$OUT/page.html"
+if [ "$TEAM" = "home" ]; then
+  URL="https://www.nhl94online.com/index.php?lg=$LG&sublg=$SUBLG"; TPATH="/index.php"; BASE="https://www.nhl94online.com/"
+else
+  URL="https://nhl94online.com/html/coachpage.php?lg=$LG&sublg=$SUBLG&team_ID=$TEAM"; TPATH="/html/coachpage.php"; BASE="https://nhl94online.com/html/"
+fi
+curl -sL "$URL" -o "$OUT/page.html"
 
-python3 - "$ROOT/nhl94-its-in-the-script.user.js" "$OUT/page.html" "$OUT/test.html" "$VIEW" <<'EOF'
+python3 - "$ROOT/nhl94-its-in-the-script.user.js" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYTEAM:-}" <<'EOF'
 import sys, json
-js_path, src, out, view = sys.argv[1:5]
+js_path, src, out, view, tpath, base, myteam = sys.argv[1:8]
 js = open(js_path, encoding='utf-8').read()
 s = open(src, encoding='latin-1').read()
-s = s.replace('charset=iso-8859-1', 'charset=utf-8').replace('<head>', '<head><base href="https://nhl94online.com/html/">', 1)
-pre = 'localStorage.clear();' + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
+s = s.replace('charset=iso-8859-1', 'charset=utf-8').replace('<head>', f'<head><base href="{base}">', 1)
+pre = f'window.__nxTestPath={json.dumps(tpath)};localStorage.clear();' + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
+if myteam:
+    pre += f'localStorage.setItem("nx:myteam",{json.dumps(myteam)});'
 s = s.replace('</body>', '<script>' + pre + 'window.addEventListener("load",()=>{try{' + js +
               '}catch(e){document.title="SCRIPT ERROR: "+e.message}});</script></body>')
 open(out, 'w', encoding='utf-8').write(s)
