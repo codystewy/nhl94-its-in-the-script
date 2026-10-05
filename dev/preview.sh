@@ -4,6 +4,7 @@
 #   team_ID  a coach page team_ID (default 6714 = Calgary, SNES-CD, Classic '94-2026 Fall), or "home"
 #            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
+#   SCRIPT=path  inject a different build (e.g. dev/out/nhl94-its-in-the-script.latest.user.js)
 #   EXTRA_JS='...' runs before the script (e.g. preset filters: localStorage.setItem("nx:mode:", '"done"'))
 #   MYLEAGUES='[{"path":"/html/coachpage.php?lg=287&sublg=SNES-CD&team_ID=6714","team":"Calgary","coach":"Stewy","league":"Classic \'94-2026 Fall"}]'
 #            seeds My Leagues (stored via the localStorage fallback, since there's no Tampermonkey here)
@@ -29,7 +30,7 @@ else
 fi
 curl -sL "$URL" -o "$OUT/page.html"
 
-python3 - "$ROOT/nhl94-its-in-the-script.user.js" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYLEAGUES:-}" "$URL" <<'EOF'
+python3 - "${SCRIPT:-$ROOT/nhl94-its-in-the-script.user.js}" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYLEAGUES:-}" "$URL" <<'EOF'
 import sys, json
 js_path, src, out, view, tpath, base, myleagues, url = sys.argv[1:9]
 js = open(js_path, encoding='utf-8').read()
