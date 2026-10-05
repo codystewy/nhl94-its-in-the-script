@@ -16,7 +16,7 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
     - **Coach page:** `teamPalette(myTeam)`, built from `TEAM_COLORS` (1993-94 primary/secondary per city). Near-black primaries (Bruins, Kings, Penguins) use their second colour for buttons.
     - **Home page:** `HOME_PALETTE`, the original site's royal blue `#3366CC` hero, dark red `#9B0000` buttons, yellow `#FFCC00` highlights and blue links in Day mode.
     - `makePalette()` works out readable text colours (`--nx-acc-n` / `--nx-acc-d`, `--nx-on-red`, `--nx-on-gold`) with WCAG contrast maths, so any team works.
-  - **Mode:** `data-nx-theme="night"` (the default) or `"day"` on each `.nx-v1` root. It's saved as `nx:theme`, and the ☀/☾ buttons sit in the bottom-right VIEW switcher. Night uses navy surfaces. Day uses the original site's light blues and its own `/images/bg.gif` background. The hero band stays a saturated team colour with white text in both modes. The ticker and top bar stay dark in both.
+  - **Mode:** `data-nx-theme="night"` (the default) or `"day"` on each `.nx-v1` root. It's saved as `nx:theme`, and it's switched from **⚙ Settings → Colour Mode**. Night uses navy surfaces. Day uses the original site's light blues and its own `/images/bg.gif` background. The hero band stays a saturated team colour with white text in both modes. The ticker and top bar stay dark in both.
   - **Tokens:**
     - Accents: `--nx-hero1`, `--nx-red` (button/active fill), `--nx-gold` (highlight fill), and `--nx-acc` (accent as text on the current surface).
     - Surfaces: `--nx-bg/bg2/card/card2/line/line2/text/mute/dim/strong/thead/row-home/row-away/grp1/score/hover/me/cardh*/shadow/page`.
@@ -33,7 +33,8 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 - Home rows are lighter and away rows darker, and the difference stays subtle.
 - Columns are only as wide as their data, with no wasted space, and column headers can wrap.
 - The **coach filter** is a dropdown (team logo + coach name + their Discord DM button, no town). Coaches toggle on and off, can be combined, and are **saved across refreshes** (localStorage, per `team_ID`).
-- Every design version can be switched from the **VIEW switcher** (bottom-right), just like Classic on/off. Never remove an old version.
+- The bottom-right corner holds only an **on/off switch** (new look ↔ Classic; it turns on the last design picked, `nx:lastView`, else the newest) and the **⚙ gear**. Day/Night, the version and everything saved live in **Settings**, a RetroArch RGUI-style menu that is never themed by team or mode. Never remove an old version.
+- Settings is documented with screenshots in `docs/SETTINGS.md` (linked from the README). Update it and its `docs/screenshots/settings-*.png` when a menu changes.
 
 ## Screenshots the user provides
 
@@ -86,7 +87,7 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 
 - Always work on `main`. Every push automatically rebuilds the **Latest** and **Fun** install branches through `.github/workflows/channels.yml` and `dev/build-channel.sh`. **Stable** only moves on `/git release`.
 - `CHANNEL` (`'stable'|'latest'|'fun'`) and `FUN` are constants near the top of the script, and the build stamps them. **Fun-only extras** (custom scrollbars, social feeds…) get an entry in `FUN_EXTRAS` (`id: { name, added }`), and every piece of them is wrapped in `if (funOn('id'))`. They most likely never reach Stable. `/git summary` lists them by age, and `/git fun remove <id>` retires one. When the user asks for something playful or says "fun only", build it this way from the start.
-- The switcher shows `v<version>` plus a gold LATEST/FUN tag. To preview a channel build: `dev/build-channel.sh fun && SCRIPT=dev/out/nhl94-its-in-the-script.fun.user.js dev/preview.sh 6716 v1`.
+- ⚙ Settings shows `v<version>` plus LATEST/FUN at its top right. To preview a channel build: `dev/build-channel.sh fun && SCRIPT=dev/out/nhl94-its-in-the-script.fun.user.js dev/preview.sh 6716 v1`.
 
 ## Releases and pushing: use the `/git` skill
 

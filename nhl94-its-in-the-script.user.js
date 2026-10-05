@@ -331,7 +331,6 @@
   function setMode(mode) {
     store.set('theme', mode);
     $$('.nx-v1').forEach((el) => el.setAttribute('data-nx-theme', mode));
-    $$('.nx-sw-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
   }
 
   // ============================================================
@@ -2173,7 +2172,7 @@
       });
       return f;
     };
-    const otherKeys = () => Object.keys(ls()).filter((k) => !/^nx:(theme|view|mlIntro|dcIntro)$/.test(k) && !/^nx:(opp|mode|collapsed):/.test(k));
+    const otherKeys = () => Object.keys(ls()).filter((k) => !/^nx:(theme|view|lastView|mlIntro|dcIntro)$/.test(k) && !/^nx:(opp|mode|collapsed):/.test(k));
     const replayIntro = (ml) => {
       store.set(ml ? 'mlIntro' : 'dcIntro', false); // false = replay on the next V1 page, even if already set up
       const app = $('.nx-root.nx-active');
@@ -2182,6 +2181,7 @@
       else say(ml ? 'It plays next time you open a V1 page.' : 'It plays next time you open a coach page in V1.');
     };
     const BACK = { label: 'Back', help: 'Go back.', act: back };
+    const flipMode = () => { setMode(getMode() === 'day' ? 'night' : 'day'); paint(); };
 
     // Each page: { title, text?, field?, items: [{ label, val, sub, help, act, confirm, cycle, off }] }
     function page(p) {
@@ -2192,7 +2192,7 @@
           return { title: 'Settings', items: [
             { label: 'My Leagues', val: leagues.length ? `${leagues.length} saved` : '', sub: true, help: 'Your coach pages, one per league. Saved as myLeagues (Tampermonkey).', act: () => go('leagues') },
             { label: 'Discord DMs', val: links.length ? `${links.length} linked` : '', sub: true, help: 'Coaches you can DM in one click. Saved as coachLinks (Tampermonkey).', act: () => go('dms') },
-            { label: 'Look', val: cap(getMode()), sub: true, help: 'Day or Night, and which page design to show.', act: () => go('look') },
+            { label: 'Colour Mode', val: cap(getMode()), help: 'Enter or ← → switches Day / Night on every page. Saved as nx:theme.', act: flipMode, cycle: flipMode },
             { label: 'Tips & Intros', sub: true, help: 'Replay the My Leagues and Discord DM walkthroughs.', act: () => go('intros') },
             { label: 'Schedule Filters', val: nf ? `${nf} page${nf === 1 ? '' : 's'}` : '', sub: true, help: 'Coach picks, tabs and folded opponents, remembered per coach page.', act: () => go('filters') },
             ...(other ? [{ label: 'Other Saved Bits', val: String(other), sub: true, help: 'Leftovers from older versions.', act: () => go('other') }] : []),
@@ -2245,16 +2245,6 @@
               ...(cur ? [{ label: 'Remove Link', confirm: true, help: `Forget ${p.coach}'s Discord link.`, act: () => { coachLinks.remove(p.coach); back(); } }] : []),
               { label: p.only ? 'Cancel' : 'Back', help: 'Leave without saving.', act: back },
             ] };
-        }
-        case 'look': {
-          const views = VERSIONS, vi = Math.max(0, views.findIndex((v) => v.id === store.get('view', DEFAULT_VIEW)));
-          const flip = () => { setMode(getMode() === 'day' ? 'night' : 'day'); paint(); };
-          const turn = (d) => { setView(views[(vi + d + views.length) % views.length].id); paint(); };
-          return { title: 'Look', items: [
-            { label: 'Colour Mode', val: cap(getMode()), help: '← → or Enter switches Day / Night. Saved as nx:theme.', act: flip, cycle: flip },
-            { label: 'Page View', val: views[vi].title, help: '← → or Enter picks the page design. Saved as nx:view.', act: () => turn(1), cycle: turn },
-            BACK,
-          ] };
         }
         case 'intros': {
           const ml = store.get('mlIntro', null), dc = store.get('dcIntro', null);
@@ -2341,7 +2331,7 @@
       const help = flash.text ? flash.text : (items[p.sel] || {}).help || '';
       const t = new Date(), clock = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
       inner.innerHTML = `<div class="nx-rg-head"><button type="button" class="nx-rg-back" data-rg="back">${stack.length > 1 && !p.only ? '‹ Back' : '✕ Close'}</button>
-          <h2 id="nx-rg-title">${esc(pg.title)}</h2><span class="nx-rg-ver">v${esc(SCRIPT_VERSION)}</span></div>
+          <h2 id="nx-rg-title">${esc(pg.title)}</h2><span class="nx-rg-ver">v${esc(SCRIPT_VERSION)}${CHANNEL === 'stable' ? '' : ' ' + CHANNEL.toUpperCase()}</span></div>
         <div class="nx-rg-list" role="menu" aria-label="${esc(pg.title)}">
           ${(pg.text || []).map((x) => `<p class="nx-rg-text">${x}</p>`).join('')}
           ${pg.field ? `<label class="nx-rg-field"><input type="text" autocomplete="off" spellcheck="false" data-page="${stack.length + p.id}"
@@ -2441,18 +2431,23 @@
   body[data-nx-view]:not([data-nx-view="classic"]) { margin: 0 !important; background: #0a0c11 !important; }
   body[data-nx-view]:not([data-nx-view="classic"]) > *:not(.nx-root):not(.nx-switch):not(.nx-set) { display: none !important; }
   .nx-root:not(.nx-active) { display: none !important; }
-  .nx-switch { position: fixed; right: 14px; bottom: 14px; z-index: 2147483000; display: flex; align-items: center; gap: 2px; padding: 3px;
+  .nx-switch { position: fixed; right: 14px; bottom: 14px; z-index: 2147483000; display: flex; align-items: center; gap: 4px; padding: 4px;
     font: 600 12px Inter, "Segoe UI", system-ui, sans-serif; background: rgba(17,20,27,.94); border: 1px solid #323a4a; border-radius: 10px;
     box-shadow: 0 10px 30px rgba(0,0,0,.45); backdrop-filter: blur(8px); }
-  .nx-switch-lab { padding: 0 8px 0 6px; font: 400 7px "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; }
-  .nx-switch button { font: inherit; color: #9aa3b5; background: none; border: 0; border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+  .nx-switch button { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; font: inherit; color: #9aa3b5; background: none; border: 0;
+    border-radius: 7px; padding: 4px 10px; cursor: pointer; }
   .nx-switch button:hover { color: #fff; background: rgba(255,255,255,.06); }
-  .nx-switch button[aria-pressed="true"] { color: #111; background: #F1BE48; }
   .nx-switch button:focus-visible { outline: 2px solid #F1BE48; outline-offset: 1px; }
-  .nx-sw-mode { display: flex; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid #323a4a; }
-  body[data-nx-view="classic"] .nx-sw-mode { display: none; }
-  .nx-sw-ver { margin-left: 4px; padding: 0 6px 0 8px; border-left: 1px solid #323a4a; font: 400 7px/1 "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; white-space: nowrap; }
-  .nx-sw-chan { display: inline-block; margin-left: 5px; padding: 2px 3px; border-radius: 3px; color: #111; background: #F1BE48; }
+  /* On/off switch: the redesign (on) or the original site (off). */
+  .nx-sw-tog .lab { font: 400 8px "Press Start 2P", monospace; letter-spacing: .5px; }
+  .nx-sw-tog .track { position: relative; width: 36px; height: 20px; border-radius: 10px; background: #3a4252; transition: background .15s; }
+  .nx-sw-tog .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #c9d0dc;
+    transition: transform .15s; }
+  .nx-sw-tog[aria-checked="true"] { color: #fff; }
+  .nx-sw-tog[aria-checked="true"] .track { background: #F1BE48; }
+  .nx-sw-tog[aria-checked="true"] .track::after { transform: translateX(16px); background: #111; }
+  .nx-sw-gear { padding: 4px 9px !important; border-left: 1px solid #323a4a !important; border-radius: 0 7px 7px 0 !important; }
+  @media (prefers-reduced-motion: reduce) { .nx-sw-tog .track, .nx-sw-tog .track::after { transition: none; } }
   `);
 
   const rendered = {};
@@ -2460,22 +2455,18 @@
   sw.className = 'nx-switch';
   sw.setAttribute('role', 'group');
   sw.setAttribute('aria-label', 'Page view');
-  sw.title = 'Switch view (Alt+Shift+V)';
-  sw.innerHTML = '<span class="nx-switch-lab">VIEW</span>' + VERSIONS.map((v) =>
-    `<button type="button" data-view="${v.id}" title="${esc(v.title)}">${esc(v.label)}</button>`).join('') +
-    '<span class="nx-sw-mode" role="group" aria-label="Colour mode">' +
-    '<button type="button" data-mode="day" title="Day mode" aria-label="Day mode">☀</button>' +
-    '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>' +
-    `<button type="button" class="nx-sw-gear" data-settings title="Settings" aria-label="Settings" aria-haspopup="dialog">${GEAR_SVG}</button>` +
-    `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION} · ${CHANNEL} channel">v${SCRIPT_VERSION}` +
-    (CHANNEL === 'stable' ? '' : `<span class="nx-sw-chan">${CHANNEL.toUpperCase()}</span>`) + '</span>';
+  // The switch turns the newest design (or the last one picked) on, or goes back to the original site.
+  const onView = () => { const v = store.get('lastView', DEFAULT_VIEW); return VERSIONS.some((x) => x.id === v && v !== 'classic') ? v : DEFAULT_VIEW; };
+  const onLabel = () => (VERSIONS.find((x) => x.id === onView()) || {}).label || 'V1';
+  sw.innerHTML = `<button type="button" class="nx-sw-tog" role="switch" aria-checked="false" title="Turn the new look on or off (Alt+Shift+V)">
+      <span class="lab">${esc(onLabel())}</span><span class="track" aria-hidden="true"></span></button>`
+    + `<button type="button" class="nx-sw-gear" data-settings title="Settings" aria-label="Settings" aria-haspopup="dialog">${GEAR_SVG}</button>`;
   document.body.appendChild(sw);
   setSetup();
+  const tog = $('.nx-sw-tog', sw);
+  tog.setAttribute('aria-label', 'New look (' + onLabel() + ')');
+  tog.addEventListener('click', () => setView(document.body.getAttribute('data-nx-view') === 'classic' ? onView() : 'classic'));
   $('[data-settings]', sw).addEventListener('click', (e) => openSettings(e.currentTarget));
-  $$('.nx-sw-mode button', sw).forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.mode === getMode()));
-    b.addEventListener('click', () => setMode(b.dataset.mode));
-  });
 
   function setView(id) {
     if (!VERSIONS.some((v) => v.id === id)) id = DEFAULT_VIEW;
@@ -2490,16 +2481,16 @@
       vp = document.createElement('meta'); vp.name = 'viewport'; vp.content = 'width=device-width, initial-scale=1'; vp.dataset.nx = '1';
       document.head.appendChild(vp);
     } else if (id === 'classic' && vp) vp.remove();
-    $$('button[data-view]', sw).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === id)));
+    tog.setAttribute('aria-checked', String(id !== 'classic'));
+    $('.lab', tog).textContent = id === 'classic' ? onLabel() : (VERSIONS.find((x) => x.id === id) || {}).label;
     store.set('view', id);
+    if (id !== 'classic') store.set('lastView', id);
   }
-  sw.addEventListener('click', (e) => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
   document.addEventListener('keydown', (e) => {
     if (!(e.altKey && e.shiftKey && e.code === 'KeyV')) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName)) return;
     e.preventDefault();
-    const i = VERSIONS.findIndex((v) => v.id === document.body.getAttribute('data-nx-view'));
-    setView(VERSIONS[(i + 1) % VERSIONS.length].id);
+    tog.click();
   });
 
   // Users of the pre-switcher build who chose "Classic view" stay on classic.
