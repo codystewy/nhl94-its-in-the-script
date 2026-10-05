@@ -115,28 +115,6 @@ Every row says what it does and where it's saved, and anything that deletes need
 
 **[📖 Full Settings guide, with screenshots of every menu →](docs/SETTINGS.md)**
 
-## What V1 gives you
-
-**Home page**
-
-- **Latest Scores** for each level, with team logos, coach names, the winner highlighted, OT tags and Box Score buttons.
-- **★ My Leagues:** in a lot of leagues? Press **+ Add to My Leagues** on each of your coach pages. They show up in the **★ My Leagues** menu in the top bar on every page and on the home page, and your levels get a ★ in the score tabs. Under **Manage**, you can rename or reorder them, add one by pasting a coach page link, **download a backup** (JSON), **restore** it on another browser, or **clear** your history. Nothing leaves your browser and no login is needed.
-- The RetroArch notice comes with direct Windows and Mac download buttons, and every league download is in one tidy list.
-- League card: every team with its coach. Switch season and level from the league bar up top.
-
-**Coach page**
-
-- **Team colors:** every coach page is themed in that team's own colors (1993-94 era), in both Day and Night mode. The home page uses the original site's red, white and blue.
-- **Coach names everywhere:** on the schedule, standings, filters and league list.
-- **💬 Discord DMs:** link a coach once with **+ DM**, then **CHAT** opens your Discord DM with them. Links are saved with My Leagues and included in backups.
-- **Schedule grouped by opponent:** one header per opponent with their logo, coach, your record against them, a box per game for wins and losses, and games left. Click a header to collapse it.
-- **League bar:** the season (newest first) and level pickers sit right under the menu bar on every page, where the original site keeps them.
-- **Filters:** All / To Play / Final tabs, plus **Filter by Coach**, a dropdown with each coach's logo, name and Discord DM button where you can pick one or more coaches. Both are saved per coach page.
-- **Checkpoint tracker:** games left, a progress bar and a countdown that turns red as the deadline gets close.
-- **Quick actions:** **Log Game** and **Box Score** sit right next to each game.
-- **Clear home and away rows:** home rows are lighter and away rows are darker.
-- **Team info at a glance:** division rank, record splits, goal difference, and the full league directory with coaches.
-
 ## Development
 
 - `nhl94-its-in-the-script.user.js`: the whole script. It has a page router (`PAGE`), shared data scraping, one renderer per page and version (`renderHomeV1`, `renderCoachV1`, …), and the version switcher.
