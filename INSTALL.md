@@ -29,7 +29,7 @@ Not sure? Pick **Stable**. You can switch any time.
    - Turn on **Allow User Scripts**.
    - On older Chrome versions that don't have this toggle, turn on **Developer mode** (top-right of `chrome://extensions`) instead.
 4. **Install the script.** Click the install link for [your channel](#pick-a-channel). Most people want **[Install Stable](https://raw.githubusercontent.com/codystewy/nhl94-its-in-the-script/stable/nhl94-its-in-the-script.user.js)**. Tampermonkey opens an install screen. Click **Install**.
-5. **Check it works.** Open [nhl94online.com](https://www.nhl94online.com). You should see the new look and a **VIEW · Classic · V1** switcher in the bottom-right corner.
+5. **Check it works.** Open [nhl94online.com](https://www.nhl94online.com). You should see the new look, and an on/off switch and a ⚙ gear in the bottom-right corner.
 
 ## Brave
 
@@ -61,9 +61,9 @@ Firefox doesn't need an extra toggle.
 
 ## Using it
 
-- **Switch looks:** use the **VIEW** switcher in the bottom-right corner (**Classic** is the original site), or press **Alt + Shift + V**.
+- **Switch looks:** flip the switch in the bottom-right corner (off is the original site), or press **Alt + Shift + V**. Day / Night lives in **⚙ Settings**, explained in the [Settings guide](docs/SETTINGS.md).
 - **Pin your team:** on your coach page, press **☆ Set as my team**. The home page then shows a shortcut to your schedule.
-- **Which channel am I on?** Look at the far right of the VIEW switcher. Stable shows just the version (`v1.4.1`). Latest and Fun show a longer number plus a gold **LATEST** or **FUN** tag (`v1.4.1.57 LATEST`).
+- **Which channel am I on?** Open **⚙ Settings** (bottom-right gear) and look at the top right. Stable shows just the version (`v1.4.1`). Latest and Fun show a longer number plus **LATEST** or **FUN** (`v1.4.1.57 LATEST`).
 - **Updates** arrive on their own. Tampermonkey checks for a new version about once a day. To check right away, open the Tampermonkey dashboard and do one of these:
   - On the **Installed userscripts** tab, click the date in the **Last updated** column next to the script.
   - Or go to **Utilities** and click **Check for userscript updates**.
@@ -75,7 +75,7 @@ Each channel shows up in Tampermonkey as its own script: *NHL94 – It's In The 
 1. Open the Tampermonkey dashboard (click the Tampermonkey icon → **Dashboard**).
 2. Turn **off** the channel you're leaving with its toggle, or delete it with the trash-can icon.
 3. Click the install link for the new channel in [Pick a channel](#pick-a-channel), then **Install**.
-4. Reload nhl94online.com and check the label at the right end of the VIEW switcher.
+4. Reload nhl94online.com, open **⚙ Settings** and check the version at the top right.
 
 Your saved stuff (My Leagues, filters, Day/Night, view) is shared, so it comes with you when you switch.
 
@@ -85,10 +85,10 @@ Your saved stuff (My Leagues, filters, Day/Night, view) is shared, so it comes w
 
 | Problem | Fix |
 | --- | --- |
-| The site looks unchanged and there's no VIEW switcher | Chrome, Brave or Edge: turn on **Allow User Scripts** (step 3 above), then reload the page. Also check the script is switched **on** in the Tampermonkey dashboard. |
+| The site looks unchanged and there's no switch or ⚙ gear in the corner | Chrome, Brave or Edge: turn on **Allow User Scripts** (step 3 above), then reload the page. Also check the script is switched **on** in the Tampermonkey dashboard. |
 | Tampermonkey's icon shows a warning about Developer mode | Same fix: turn on **Allow User Scripts** for Tampermonkey. |
 | Clicking the install link just shows code | Tampermonkey isn't installed or is turned off. Install it, then click the link again. |
 | Only some pages look different | That's expected. Pages are redesigned one at a time, and the rest stay classic for now. |
-| I want the old site back | Click **Classic** in the VIEW switcher. Or turn the script off in Tampermonkey. |
-| I switched channels but nothing changed | Make sure only one channel is switched on in the dashboard, then reload. The label at the right end of the VIEW switcher shows which one is running. |
+| I want the old site back | Turn the switch in the bottom-right corner off. Or turn the script off in Tampermonkey. |
+| I switched channels but nothing changed | Make sure only one channel is switched on in the dashboard, then reload. The version at the top right of ⚙ Settings shows which one is running. |
 | Uninstall | Tampermonkey dashboard → trash-can icon next to the script. |

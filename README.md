@@ -22,6 +22,8 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 <p align="center"><img src="docs/screenshots/feature-dm-howto.png" alt="The how-to card that shows new users how to link a coach's Discord DM" width="640"><br><sub>First time on a coach page? A quick walkthrough shows you how.</sub></p>
 
+<p align="center">🔒 Your links are <b>personal</b>: each one opens <i>your</i> private DM, so it won't work for anyone you share it with.</p>
+
 <br>
 
 ![V1 home page](docs/screenshots/home-v1.png)
@@ -74,26 +76,44 @@ See the full [changelog](CHANGELOG.md) for everything else.
 
 3. Open [nhl94online.com](https://www.nhl94online.com) or any coach page.
 
-The label at the right end of the VIEW switcher shows which channel you're on. To switch, see [Switching channels](INSTALL.md#switching-channels).
+The version at the top right of **⚙ Settings** shows which channel you're on. To switch, see [Switching channels](INSTALL.md#switching-channels).
 
 **Redesigned pages so far:** Home and Coach pages. Pages that haven't been redesigned yet look exactly like the original site.
 
 Updates install automatically. Tampermonkey checks this repo about once a day: Stable updates when a new version is released, and Latest and Fun update with every change.
 
-## Switching views
+## Switching the new look on and off
 
-A **VIEW** switcher sits in the bottom-right corner of every redesigned page:
-
-| View | What it is |
+| On | Off |
 | --- | --- |
-| **Classic** | The original nhl94online.com page, untouched |
-| **V1** | *Rink Night*: a dark NHL 26 broadcast look with 16-bit touches |
+| ![Switch on](docs/screenshots/switch-on.png) | ![Switch off](docs/screenshots/switch-off.png) |
 
-Next to the views there's a **☀ Day / ☾ Night** toggle. Night is the default, and the choice applies to every page.
+The bottom-right corner of every redesigned page has two controls:
 
-The **⚙** gear opens **Settings**, a menu styled after RetroArch's, so it feels right at home. Use the arrow keys and Enter (or the mouse), and ← / Esc to go back. It lists everything the script has saved in your browser (My Leagues, Discord links, look, intros, schedule filters) and clears one part at a time. It's also where you link coaches' Discord DMs, replay the intros, and download or restore a backup.
+- **The switch:** one click turns the new look (**V1** · *Rink Night*, a dark NHL 26 broadcast look with 16-bit touches) on or off. Off shows the original nhl94online.com page, untouched. **Alt + Shift + V** does the same.
+- **The ⚙ gear** opens Settings (see below).
 
-The page remembers your choices. Press **Alt + Shift + V** to cycle through the views. New designs are added as new versions; old ones stay available.
+The page remembers your choice. New designs are added as new versions; old ones stay available.
+
+## ⚙ Settings
+
+<p align="center"><img src="docs/screenshots/settings-main.png" alt="The Settings main menu, styled after RetroArch" width="640"></p>
+
+The gear opens a menu styled after RetroArch's, so it feels right at home. Use the arrow keys and Enter (or the mouse), and ← / Esc to go back. From here you can:
+
+- see your **My Leagues** and link coaches' **Discord DMs**
+- switch **Colour Mode** between Day and Night (Night is the default)
+- replay the **intros**
+- clear one coach page's **schedule filters**
+- **back up**, **restore** or **reset** everything
+
+Every row says what it does and where it's saved, and anything that deletes needs a second press.
+
+> 🔒 **Everything is stored only in your own browser.** There's no account and nothing is uploaded. A different browser or computer starts empty, so use **Backup & Restore** to bring your setup along.
+>
+> 💬 **Discord links are personal to you.** Each one opens *your* private DM with that coach. If you share a link (or your backup), it won't open anything for the other person. They link their own coaches.
+
+**[📖 Full Settings guide, with screenshots of every menu →](docs/SETTINGS.md)**
 
 ## What V1 gives you
 
