@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Render a real nhl94online.com coach page with the userscript injected, using headless Chrome.
-# Usage: dev/preview.sh [team_ID|home] [view] [width] [height]
+# Usage: dev/preview.sh [team_ID|home|standings|roster|records|players|allstats|siterecords|box] [view] [width] [height]
+#   stats pages use LG/SUBLG; QS='a=1&b=2' replaces the query string, TID=<team_ID> picks a roster, GAMEID=<id> a box score
 #   team_ID  a coach page team_ID (default 6714 = Calgary, SNES-CD, Classic '94-2026 Fall), or "home"
 #            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
@@ -24,11 +25,19 @@ OUT="$ROOT/dev/out"
 mkdir -p "$OUT"
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 
-if [ "$TEAM" = "home" ]; then
-  URL="https://www.nhl94online.com/index.php?lg=$LG&sublg=$SUBLG"; TPATH="/index.php"; BASE="https://www.nhl94online.com/"
-else
-  URL="https://nhl94online.com/html/coachpage.php?lg=$LG&sublg=$SUBLG&team_ID=$TEAM"; TPATH="/html/coachpage.php"; BASE="https://nhl94online.com/html/"
-fi
+BASE="https://nhl94online.com/html/"
+stat() { TPATH="/html/$1.php"; URL="https://nhl94online.com/html/$1.php?${QS:-$2}"; }
+case "$TEAM" in
+  home) URL="https://www.nhl94online.com/index.php?lg=$LG&sublg=$SUBLG"; TPATH="/index.php"; BASE="https://www.nhl94online.com/" ;;
+  standings) stat standings "lg=$LG&sublg=$SUBLG" ;;
+  roster) stat roster_stats "lg=$LG&sublg=$SUBLG&disp=se${TID:+&id=$TID}" ;;
+  records) stat records "lg=$LG&sublg=$SUBLG" ;;
+  players) stat player_stats "lg=$LG&sublg=$SUBLG&disp=se" ;;
+  allstats) stat allstats "sys=GENS" ;;
+  siterecords) stat site_records "sys=GENS" ;;
+  box) stat box_score "gameid=${GAMEID:-129808}" ;;
+  *) URL="https://nhl94online.com/html/coachpage.php?lg=$LG&sublg=$SUBLG&team_ID=$TEAM"; TPATH="/html/coachpage.php" ;;
+esac
 curl -sL "$URL" -o "$OUT/page.html"
 
 python3 - "${SCRIPT:-$ROOT/nhl94-its-in-the-script.user.js}" "$OUT/page.html" "$OUT/test.html" "$VIEW" "$TPATH" "$BASE" "${MYLEAGUES:-}" "$URL" <<'EOF'
