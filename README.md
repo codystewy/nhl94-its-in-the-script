@@ -111,4 +111,4 @@ The page remembers your choices. Press **Alt + Shift + V** to cycle through the 
 
 Tampermonkey only updates when the version goes up. The commit count makes sure every push counts as newer for Latest and Fun. Stable only changes when `@version` is raised at a release. Nobody edits the `latest` or `fun` branches by hand.
 
-*Fan-made and not affiliated with EA Sports, the NHL or nhl94online.com.*
+*Fan-made and not affiliated with EA Sports or the NHL. This repo has nothing to do with the [nhl94online.com](https://nhl94online.com/) community or its admins. It was simply started to add a night mode.*
