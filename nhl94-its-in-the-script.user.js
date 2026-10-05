@@ -23,6 +23,9 @@
 
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
+  // Keep in sync with @version above (GM_info would report the dev loader's version).
+  const SCRIPT_VERSION = '1.4.1';
+
   // ============================================================
   // Helpers
   // ============================================================
@@ -1531,6 +1534,7 @@
   .nx-switch button:focus-visible { outline: 2px solid #F1BE48; outline-offset: 1px; }
   .nx-sw-mode { display: flex; gap: 2px; margin-left: 4px; padding-left: 6px; border-left: 1px solid #323a4a; }
   body[data-nx-view="classic"] .nx-sw-mode { display: none; }
+  .nx-sw-ver { margin-left: 4px; padding: 0 6px 0 8px; border-left: 1px solid #323a4a; font: 400 7px/1 "Press Start 2P", monospace; letter-spacing: .5px; color: #6b7487; white-space: nowrap; }
   `);
 
   const rendered = {};
@@ -1543,7 +1547,8 @@
     `<button type="button" data-view="${v.id}" title="${esc(v.title)}">${esc(v.label)}</button>`).join('') +
     '<span class="nx-sw-mode" role="group" aria-label="Colour mode">' +
     '<button type="button" data-mode="day" title="Day mode" aria-label="Day mode">☀</button>' +
-    '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>';
+    '<button type="button" data-mode="night" title="Night mode" aria-label="Night mode">☾</button></span>' +
+    `<span class="nx-sw-ver" title="It's In The Script v${SCRIPT_VERSION}">v${SCRIPT_VERSION}</span>`;
   document.body.appendChild(sw);
   $$('.nx-sw-mode button', sw).forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.mode === getMode()));
