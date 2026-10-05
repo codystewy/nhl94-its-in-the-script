@@ -2544,7 +2544,7 @@
   sw.setAttribute('aria-label', 'Page view');
   // The switch turns the newest design (or the last one picked) on, or goes back to the original site.
   const onView = () => { const v = store.get('lastView', DEFAULT_VIEW); return VERSIONS.some((x) => x.id === v && v !== 'classic') ? v : DEFAULT_VIEW; };
-  const onLabel = () => (VERSIONS.find((x) => x.id === onView()) || {}).label || 'V1';
+  const onLabel = () => 'v' + SCRIPT_VERSION.split('.')[0]; // the script's major version (v2), not the design's name
   sw.innerHTML = `<button type="button" class="nx-sw-tog" role="switch" aria-checked="false" title="Turn the new look on or off (Alt+Shift+V)">
       <span class="lab">${esc(onLabel())}</span><span class="track" aria-hidden="true"></span></button>`
     + `<button type="button" class="nx-sw-gear" data-settings title="Settings" aria-label="Settings" aria-haspopup="dialog">${GEAR_SVG}</button>`;
@@ -2569,7 +2569,6 @@
       document.head.appendChild(vp);
     } else if (id === 'classic' && vp) vp.remove();
     tog.setAttribute('aria-checked', String(id !== 'classic'));
-    $('.lab', tog).textContent = id === 'classic' ? onLabel() : (VERSIONS.find((x) => x.id === id) || {}).label;
     store.set('view', id);
     if (id !== 'classic') store.set('lastView', id);
   }
