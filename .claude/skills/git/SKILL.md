@@ -1,17 +1,36 @@
 ---
 name: git
-description: "Git push for the nhl94-its-in-the-script repo. Commits anything uncommitted (Conventional Commits), summarizes every unpushed change, decides whether a release is warranted (patch/minor/major), previews the version bump, CHANGELOG entry and README What's new, then pushes after the user confirms. Use when the user types /git, /git push, /git status, or asks to push changes or cut a release."
-argument-hint: "push | status"
+description: "Git push and releases for the nhl94-its-in-the-script repo, which ships three install channels (Stable, Latest, Fun). /git push commits anything uncommitted (Conventional Commits) and pushes main, which auto-updates Latest + Fun. /git release cuts a SemVer release (CHANGELOG, README What's new, tag) and moves the stable branch. /git hotfix puts one fix on Stable. /git status previews. Use when the user types /git, /git push, /git release, /git hotfix, /git status, or asks to push changes, release, or ship something to stable."
+argument-hint: "push | release | hotfix <commit> | status"
 ---
 
-# /git: summarize, version and push
+# /git: push, release, hotfix
 
-`/git push` (or just `/git`) runs the whole flow below. `/git status` runs steps 1–3 only and stops with the preview, without committing, bumping or pushing anything.
+The repo is `codystewy/nhl94-its-in-the-script`. The shipped file is `nhl94-its-in-the-script.user.js`. Versions are SemVer `1.MINOR.PATCH`, tagged `vX.Y.Z`.
 
-The repo is `codystewy/nhl94-its-in-the-script`, and the shipped file is `nhl94-its-in-the-script.user.js`. Versions are SemVer `1.MINOR.PATCH` and are tagged `vX.Y.Z`.
+## Channels (how shipping works)
 
-## 1. Gather
+All work happens on `main`. People install from one of three branches:
 
+| Branch | Moves when | Version users see |
+| --- | --- | --- |
+| `stable` | `/git release` or `/git hotfix` pushes to it | `X.Y.Z` |
+| `latest` | automatically on every push to `main` (`.github/workflows/channels.yml` runs `dev/build-channel.sh latest`) | `X.Y.Z.<commit count>` |
+| `fun` | same as latest, built with `CHANNEL = 'fun'` | `X.Y.Z.<commit count>` |
+
+- Never edit `latest` or `fun` by hand. Never push work-in-progress to `stable`.
+- Fun-only extras are gated with `if (FUN)` in the script. Keep that in mind when previewing a release: Stable gets the code, but `FUN` is off there.
+
+| Command | Does |
+| --- | --- |
+| `/git` or `/git push` | Commit + push `main`. No release question. |
+| `/git release` | Version bump, CHANGELOG, README, tag, push, move `stable`, GitHub release. |
+| `/git hotfix <commit>` | Ship one fix to Stable without everything else on `main`. |
+| `/git status` | Preview only: what's unpushed and what the next release would be. Writes nothing. |
+
+## Shared steps
+
+### Gather
 ```bash
 git status --short
 git fetch -q origin
@@ -21,13 +40,15 @@ git log --oneline "$LAST"..HEAD                              # everything since 
 grep -m1 '@version' nhl94-its-in-the-script.user.js          # current script version
 ```
 
-- **Uncommitted changes:** group them into logical commits, one per change, each with a [Conventional Commits](https://www.conventionalcommits.org) message: `feat|fix|style|perf|refactor|docs|chore(scope): what changed`. Scopes: `home`, `coach`, `theme`, `my-leagues`, `nav`, `standings`, `install`, `skill`, `dev`… Never commit `screenshots/`, `dev/out/`, or `dev/local-loader.user.js`; they're gitignored, so keep it that way. End each message with the attribution line from the system reminder. In `status` mode, only list what you *would* commit.
-- **Code changes:** if the script changed, run `node --check nhl94-its-in-the-script.user.js` before going on. If it fails, stop and report.
+### Commit anything uncommitted
+- Group the changes into logical commits, one per change. Use a [Conventional Commits](https://www.conventionalcommits.org) message: `feat|fix|style|perf|refactor|docs|chore(scope): what changed`.
+- Scopes: `home`, `coach`, `theme`, `my-leagues`, `nav`, `standings`, `install`, `skill`, `dev`, `ci`, `channels`…
+- Never commit `screenshots/`, `dev/out/`, or `dev/local-loader.user.js`. They're gitignored, so keep it that way.
+- End each message with the attribution line from the system reminder.
+- If the script changed, run `node --check nhl94-its-in-the-script.user.js` first. If it fails, stop and report.
 
-## 2. Summarize every change
-
-Print one line per change since the last release tag, newest first, grouped by category:
-
+### Summarize changes
+One line per change, newest first, grouped by category:
 ```
 ✨ Features   feat(my-leagues): …  → plain-English one-liner of what a player notices
 🐛 Fixes      fix(standings): …    → …
@@ -35,73 +56,83 @@ Print one line per change since the last release tag, newest first, grouped by c
 📖 Docs/other docs/chore/refactor  → …
 ```
 
-Mark which ones are **not pushed yet**.
+**Writing style** (summaries, CHANGELOG, README):
+- Plain English, upbeat and a little funny. Hockey puns welcome.
+- **No technical jargon:** never "refactor", "tokens", "localStorage", "DOM", "regex", "selector".
+- Describe what a player sees or can now do.
 
-## 3. Decide the version
+## /git push (default)
 
-Base it on all commits since the last tag:
+1. Gather, then commit anything uncommitted.
+2. `git push origin main`.
+3. Report in a few lines:
+   - the summary of what was pushed
+   - "Latest + Fun users get this on their next update check (version `X.Y.Z.<count>`)", using `git rev-list --count HEAD`
+   - optionally, one line confirming the workflow started: `gh run list --workflow channels.yml -L 1`
+   - if anything since the last tag is a `feat`/`fix`/`style`/`perf`, add one line: "Stable is N changes behind. Say `/git release` when you're happy."
 
-| Contains | Release | Example |
-| --- | --- | --- |
-| A breaking change (`!` after the type, `BREAKING CHANGE:`, removes a feature, wipes saved data, changes `@match`/`@grant` in a way that needs users to re-approve) | **MAJOR**. Ask first, never assume | 1.4.1 → 2.0.0 |
-| Any `feat` | **MINOR** | 1.4.1 → 1.5.0 |
-| Only `fix` / `style` / `perf` | **PATCH** | 1.4.1 → 1.4.2 |
-| Only `docs` / `chore` / `refactor` / dev tooling | **No release.** Say so: "Not enough to warrant a version change. These can be pushed as-is." | – |
+Don't ask a release question. Don't bump the version.
 
-Then show a preview, without writing anything yet:
+## /git release
 
-- **Proposed version:** `vX.Y.Z` (current `@version` → new), with a one-line reason.
-- **Release summary:** 2–4 sentences on what players get.
-- **CHANGELOG preview:** the exact markdown entry that would go at the top of `CHANGELOG.md`:
-  ```markdown
-  ## [X.Y.Z] – YYYY-MM-DD
-  ### ✨ New
-  - **Bold hook.** One fun, plain sentence.
-  ### 🎨 Looks
-  ### 🐛 Fixed
-  ```
-  Leave out empty groups. Add a compare link: `[X.Y.Z]: https://github.com/codystewy/nhl94-its-in-the-script/compare/vLAST...vX.Y.Z`.
-- **README "What's new" preview:** the replacement block (`**vX.Y.Z:** …` plus 2–5 emoji bullets).
+1. Gather, then commit anything uncommitted.
+2. Summarize every change since `$LAST`.
+3. Decide the version from all commits since the last tag:
 
-**Writing style:** plain English, upbeat and a little funny, with hockey puns welcome. **No technical jargon** (never "refactor", "tokens", "localStorage", "DOM", "regex", "selector"). Describe what a player sees or can now do.
+   | Contains | Release |
+   | --- | --- |
+   | Breaking (`!`, `BREAKING CHANGE:`, removes a feature, wipes saved data, `@match`/`@grant` change that needs users to re-approve) | **MAJOR**. **Ask first** (AskUserQuestion) |
+   | Any `feat` | **MINOR** |
+   | Only `fix` / `style` / `perf` | **PATCH** |
+   | Only `docs` / `chore` / `refactor` / tooling | Nothing to release. Say so and stop (offer `/git push`). |
 
-If the args were `status`, stop here.
+   The user can name a version in the args (`/git release 1.4.2`). That version wins.
+4. Show the preview:
+   - version (`old → new` + reason)
+   - a 2–4 sentence release summary
+   - the CHANGELOG entry
+   - the README What's new block
+   - any `if (FUN)` code that stays off in Stable
 
-## 4. Confirm
+   Running `/git release` is the go-ahead, so don't ask again unless it's MAJOR.
+   - **CHANGELOG entry**, to go at the top of `CHANGELOG.md`, below the intro. Leave out empty groups. Add the compare link at the bottom: `[X.Y.Z]: https://github.com/codystewy/nhl94-its-in-the-script/compare/vLAST...vX.Y.Z`.
+     ```markdown
+     ## [X.Y.Z] – YYYY-MM-DD
+     ### ✨ New
+     - **Bold hook.** One fun, plain sentence.
+     ### 🎨 Looks
+     ### 🐛 Fixed
+     ```
+   - **README `## What's new`**: replace everything up to the next `## ` with `**vX.Y.Z:** …` plus 2–5 emoji bullets. Keep the `See the full [changelog](CHANGELOG.md)…` line.
+5. Write it:
+   1. Set `// @version      X.Y.Z` **and** `const SCRIPT_VERSION = 'X.Y.Z';` in the script.
+   2. Update the CHANGELOG and README.
+   3. Run `node --check`.
+   4. Commit `chore(release): vX.Y.Z`, then `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+6. Ship:
+   ```bash
+   git push origin main --follow-tags
+   git push origin main:stable          # fast-forward; never --force
+   gh release create vX.Y.Z --title "vX.Y.Z" --notes "<the CHANGELOG entry body>"
+   ```
+   If `main:stable` is rejected as non-fast-forward, a hotfix landed on `stable`. Merge it with `git merge origin/stable` on `main` (keep main's version), then push again.
+7. Report: the version, the release link, and "Stable users update on their next check. Latest + Fun move to `X.Y.Z.<count>`."
 
-Use AskUserQuestion. Put the recommended option first:
+## /git hotfix <commit>
 
-- **Release vX.Y.Z and push** (recommended when a release is warranted)
-- **Push without a release.** Tell the user the version stays the same, so Tampermonkey users won't get the code changes until the next release.
-- **Change the version.** Let them pick patch/minor/major or type one.
-- **Cancel**
+For when Stable needs one fix now, but `main` has unfinished stuff.
 
-## 5. Release (if chosen)
+1. `git worktree add ../nhl94-hotfix origin/stable && cd ../nhl94-hotfix && git checkout -b hotfix`
+2. `git cherry-pick <commit>`. If it conflicts, resolve it if trivial. Otherwise stop and explain.
+3. Bump PATCH. Set the version in both `@version` and `SCRIPT_VERSION`. Add a CHANGELOG entry. Run `node --check`. Commit `chore(release): vX.Y.Z`, then tag.
+4. `git push origin hotfix:stable --follow-tags`, then `gh release create …`.
+5. Back on `main`: `git merge origin/stable`, resolving the version to the hotfix version, then `git push origin main`. Remove the worktree.
+6. Report.
 
-1. Set `// @version      X.Y.Z` **and** `const SCRIPT_VERSION = 'X.Y.Z';` in `nhl94-its-in-the-script.user.js` (the second is shown in the bottom-right switcher).
-2. Insert the CHANGELOG entry at the top (below the intro), plus the compare link at the bottom.
-3. Replace the README `## What's new` section (up to the next `## `) with the new block, keeping the `See the full [changelog](CHANGELOG.md)…` line.
-4. `node --check nhl94-its-in-the-script.user.js`
-5. Commit `chore(release): vX.Y.Z` with the attribution line, then `git tag -a vX.Y.Z -m "vX.Y.Z"`.
+## /git status
 
-## 6. Push
+Gather, then summarize. Show what `/git release` *would* produce (version + CHANGELOG preview). List uncommitted changes as "would commit". Write nothing.
 
-```bash
-git push origin main --follow-tags
-```
-
-If a release was made, also publish it on GitHub:
-```bash
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "<the CHANGELOG entry body>"
-```
-
-## 7. Report
-
-Report briefly:
-- what was pushed (commit list)
-- the new version and tag, or "no version change"
-- a link to the repo or the release
-
-**Reminders:**
-- **Repo is private:** if the repo is still private, Tampermonkey auto-update won't reach anyone. Check with `gh repo view --json visibility -q .visibility`.
-- **Never** force-push, rewrite pushed history, or delete tags without the user explicitly asking.
+## Reminders
+- **Repo visibility:** while the repo is private, raw install links and auto-updates don't reach anyone. Check with `gh repo view --json visibility -q .visibility`, and mention it in the report if it's still private.
+- **Never** force-push, rewrite pushed history, or delete tags or branches without the user explicitly asking.
