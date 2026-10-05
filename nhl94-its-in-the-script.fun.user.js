@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Fun)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      2.0.1.42
+// @version      2.0.1.45
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '2.0.1.42';
+  const SCRIPT_VERSION = '2.0.1.45';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'fun';
   const FUN = CHANNEL === 'fun';
@@ -53,9 +53,12 @@
   // Which page are we on? Pages without a redesign are left untouched.
   const PATH = window.__nxTestPath || location.pathname; // __nxTestPath / __nxTestHref: set by dev/preview.sh only
   const HREF = window.__nxTestHref || location.href;
+  const STAT_PAGES = { standings: 'standings', roster_stats: 'roster', records: 'records', player_stats: 'players',
+    allstats: 'allstats', site_records: 'siterecords', box_score: 'boxscore' };
+  const statPage = (/^\/html\/([a-z_]+)\.php$/i.exec(PATH) || [])[1];
   const PAGE = /\/html\/coachpage\.php$/i.test(PATH) ? 'coach'
     : /^\/(index\.php)?$/i.test(PATH) ? 'home'
-    : null;
+    : STAT_PAGES[(statPage || '').toLowerCase()] || null;
   if (!PAGE) return;
 
   const params = new URLSearchParams(location.search);
@@ -1972,6 +1975,680 @@
   }
 
   // ============================================================
+  // Stats pages: standings, team rosters, player leaders, league records, all-time standings,
+  // site records and box scores.
+  // ------------------------------------------------------------
+  // scrapeContent() reads the page's content area in order (headings, level tabs, dropdowns,
+  // page buttons, tables) and each page lays those pieces out in V1's cards. The original
+  // dropdowns and page buttons stay on the (hidden) page and ours drive them, so every sort,
+  // filter and page link works exactly as before.
+  // ============================================================
+  const pageUrl = new URL(HREF, location.href);
+  const qp = (k) => pageUrl.searchParams.get(k) || '';
+  // The level the sidebar says is showing (stats pages pick a default level when the URL has none).
+  const curLevel = qp('sublg') || norm((($$('td').find((c) => /^Current Level:?$/.test(norm(c.textContent))) || {}).nextElementSibling || {}).textContent || '');
+  const TEAM_ABBR = {
+    ANA: 'Anaheim', BOS: 'Boston', BUF: 'Buffalo', CGY: 'Calgary', CHI: 'Chicago', DAL: 'Dallas', DET: 'Detroit', EDM: 'Edmonton',
+    FLA: 'Florida', HFD: 'Hartford', LA: 'Los Angeles', LAK: 'Los Angeles', MTL: 'Montreal', NJ: 'New Jersey', NJD: 'New Jersey',
+    NYI: 'NY Islanders', NYR: 'NY Rangers', OTT: 'Ottawa', PHI: 'Philadelphia', PIT: 'Pittsburgh', QUE: 'Quebec', SJ: 'San Jose',
+    SJS: 'San Jose', STL: 'St. Louis', TB: 'Tampa Bay', TBL: 'Tampa Bay', TOR: 'Toronto', VAN: 'Vancouver', WSH: 'Washington', WPG: 'Winnipeg',
+  };
+  const teamIdOf = (href) => { const m = /team_ID=(\d+)/i.exec(href || ''); return m ? m[1] : ''; };
+  const teamById = {};
+  Object.entries(teamInfo).forEach(([t, i]) => { const id = teamIdOf(i.href); if (id) teamById[id] = t; });
+  const teamFromFull = (name) => Object.keys(TEAMS).find((k) => fullTeamName(k).toLowerCase() === norm(name).toLowerCase().replace(/\.png$/, '')) || resolveTeam(name);
+  // Rows that belong to the viewer (a team or coach from My Leagues) get highlighted.
+  const mine = () => {
+    const l = myLeagues.all();
+    return { ids: new Set(l.map((x) => String(x.teamId))), coaches: new Set(l.map((x) => (x.coach || '').toLowerCase()).filter(Boolean)) };
+  };
+
+  // Text + links + team logos of an original element, rebuilt safely (no inline handlers or styles).
+  function richText(node) {
+    let out = '';
+    node.childNodes.forEach((c) => {
+      if (c.nodeType === 3) out += esc(c.textContent.replace(/\s+/g, ' '));
+      else if (c.nodeType !== 1 || /^(SCRIPT|STYLE|SELECT|INPUT|BUTTON)$/.test(c.tagName)) return;
+      else if (c.tagName === 'BR') out += ' ';
+      else if (c.tagName === 'A') {
+        const h = c.getAttribute('href') || '';
+        out += !h || /^\s*(javascript|data):/i.test(h) ? richText(c) : `<a href="${esc(c.href)}"${c.target ? ` target="${esc(c.target)}"` : ''}>${richText(c)}</a>`;
+      } else if (c.tagName === 'IMG') {
+        const s = c.getAttribute('src') || '';
+        if (/\/logos\d+\//.test(s)) out += `<img class="nx-logo" src="${esc(s.replace(/logos\d+\//, 'logos20/'))}" alt="${esc((c.alt || '').replace(/\.png$/, ''))}">`;
+      } else if (/^(ACRONYM|ABBR)$/.test(c.tagName) && c.title) out += `<abbr title="${esc(c.title)}">${richText(c)}</abbr>`;
+      else out += richText(c);
+    });
+    return out.replace(/\s+/g, ' ').trim();
+  }
+  const ownText = (el) => norm([...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.textContent).join(' '));
+
+  function scrapeContent() {
+    const start = $$('img').find((i) => /user-records|\/standings\.gif|heading-stats|gamelog/i.test(i.getAttribute('src') || ''));
+    const blocks = [];
+    let on = !start, done = false;
+    const walk = (n) => {
+      if (done || n.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|HEAD)$/.test(n.tagName)) return;
+      if (n === start) { on = true; return; }
+      if (!on) { [...n.children].forEach(walk); return; }
+      const tag = n.tagName, cls = n.className || '', txt = norm(n.textContent);
+      if (/^It.s our goal to keep this website/.test(txt)) { done = true; return; }
+      if (tag === 'TABLE' && !n.querySelector('table, select, input')) {
+        if (n.rows.length && (txt || n.querySelector('img'))) blocks.push({ type: 'table', el: n });
+        return;
+      }
+      if (tag === 'SELECT') { if (!/^(lg|sublg)$/.test(n.name)) blocks.push({ type: 'select', el: n }); return; }
+      if (tag === 'IMG') { const s = n.getAttribute('src') || ''; if (/\/logos(100|150)\//.test(s)) blocks.push({ type: 'logo', src: s, alt: (n.alt || '').replace(/\.png$/, '') }); return; }
+      if (!n.querySelector('table, select, img[src*="/logos1"]')) {
+        const btns = $$('input[type="button"], input[type="submit"]', n);
+        if (btns.length) { blocks.push({ type: 'pager', label: ownText(n).replace(/:$/, ''), btns }); return; }
+        if (/^(P|SPAN|DIV|H\d|FONT|B|STRONG)$/.test(tag) && !n.querySelector('p, div')) {
+          const links = $$('a', n);
+          if (links.length >= 2) {
+            blocks.push({ type: 'tabs', label: norm(ownText(n).replace(/\|/g, '')).replace(/:$/, ''), links: links.map((a) => ({ text: norm(a.textContent), href: a.href })) });
+            return;
+          }
+          if (txt) {
+            if (/:$/.test(txt) && txt.length < 40) blocks.push({ type: 'label', text: txt.replace(/:$/, '') });
+            else if (/^H\d$/.test(tag)) blocks.push({ type: 'h', level: 'sub', text: txt });
+            else if (/heading_team/.test(cls)) blocks.push({ type: 'h', level: 'team', text: txt });
+            else if (/heading(_black|2_black)/.test(cls)) blocks.push({ type: 'h', level: 'sec', text: txt });
+            else if (/heading_blue/.test(cls)) blocks.push({ type: 'value', text: txt });
+            else blocks.push({ type: 'text', text: txt, html: richText(n), red: /red/.test(cls) });
+            return;
+          }
+          return;
+        }
+      } else if (/^(P|SPAN|DIV|TD)$/.test(n.tagName) && n.querySelector('select') && ownText(n).length > 1) {
+        blocks.push({ type: 'label', text: ownText(n).replace(/:$/, '') });
+      }
+      [...n.children].forEach(walk);
+    };
+    walk(document.body);
+    // "Label:" + dropdown, and "Label:" + value ("Current Sort: PCT ↑"), belong together.
+    const out = [];
+    blocks.forEach((b) => {
+      const prev = out[out.length - 1];
+      if (prev && prev.type === 'label' && (b.type === 'select' || b.type === 'value')) { out.pop(); b.label = prev.text; }
+      if (b.type === 'value' && !b.label) b = { type: 'text', text: b.text, html: esc(b.text) };
+      out.push(b);
+    });
+    out.forEach((b) => { if (b.type === 'tabs') markTabs(b.links); });
+    return out.filter((b) => b.type !== 'label' || out.indexOf(b) === out.length - 1 || out[out.indexOf(b) + 1].type !== 'pager');
+  }
+
+  // Which tab is the page showing? Compare the URL parameter that differs between the tabs.
+  function markTabs(links) {
+    const qs = links.map((l) => new URL(l.href, location.href).searchParams);
+    const keys = [...new Set(qs.flatMap((q) => [...q.keys()]))].filter((k) => new Set(qs.map((q) => q.get(k))).size > 1);
+    const DEF = { sublg: curLevel, sys: 'GENS', type: 'sco' };
+    links.key = keys.join(',');
+    links.forEach((l, i) => { l.on = keys.length > 0 && keys.every((k) => (qp(k) || DEF[k] || '') === (qs[i].get(k) || '')); });
+  }
+
+  // ---------- Original table -> rows of title / header / data cells ----------
+  const isNum = (t) => /^[-+]?(\d[\d,]*\.?\d*|\.\d+)(%|dB)?$|^\d+[-/:]\d+([-/:]\d+)?( \(\d+%\))?$|^-$/.test(t);
+  function tableModel(t) {
+    const rows = [...t.rows].filter((r) => r.cells.length);
+    const span = (r) => [...r.cells].reduce((s, c) => s + (c.colSpan || 1), 0);
+    const ncols = Math.max(1, ...rows.map(span));
+    const out = [];
+    let carry = 0, afterTitle = false;
+    rows.forEach((r, ri) => {
+      const cells = [...r.cells];
+      const allHead = cells.every((c) => c.tagName === 'TH' || /white_bold/.test(c.className) || c.hasAttribute('background'));
+      const head = /headrow/.test(r.className) || allHead || afterTitle;
+      const texts = cells.filter((c) => norm(c.textContent));
+      const isTitle = head && texts.length === 1 && (texts[0].colSpan || 1) >= ncols - 2 && ncols > 2 && !texts[0].querySelector('a');
+      const mk = (c) => ({ html: richText(c), text: norm(c.textContent), cs: c.colSpan || 1, l: /alignleft/.test(c.className) || /text-align:\s*left/i.test(c.getAttribute('style') || '') });
+      if (isTitle) {
+        const img = cells.map((c) => c.querySelector('img')).find(Boolean);
+        out.push({ kind: 'title', text: norm(texts[0].textContent), logo: img ? img.getAttribute('src') : '' });
+        carry = cells.filter((c) => c.rowSpan > 1).reduce((s, c) => s + c.colSpan, 0);
+        afterTitle = true;
+        return;
+      }
+      const cs = cells.map(mk);
+      if (carry && cs[0]) { cs[0].cs += carry; carry = 0; }
+      out.push({ kind: head ? 'head' : 'data', cells: cs, el: r });
+      afterTitle = false;
+      if (!head && ri === 0) out[out.length - 1].kind = 'data';
+    });
+    // Column alignment from the data: words on the left, numbers centred.
+    const colL = {};
+    out.filter((r) => r.kind === 'data').forEach((r) => {
+      let col = 0;
+      r.cells.forEach((c) => {
+        if (c.cs === 1 && c.text) { const k = colL[col] || (colL[col] = { w: 0, n: 0 }); if (!isNum(c.text) && c.text.length > 4) k.w++; else k.n++; }
+        col += c.cs;
+      });
+    });
+    out.forEach((r) => {
+      if (!r.cells) return;
+      let col = 0;
+      r.cells.forEach((c) => { c.col = col; c.left = c.l || (colL[col] && colL[col].w > colL[col].n); col += c.cs; });
+    });
+    return { ncols, rows: out, title: (out.find((r) => r.kind === 'title') || {}).text || '' };
+  }
+
+  // A team code cell ("PHI", or a coach page link) becomes logo + code.
+  function teamCell(c, linkEl) {
+    const t = TEAM_ABBR[c.text] || (linkEl && teamById[teamIdOf(linkEl.getAttribute('href'))]);
+    if (!t || !TEAMS[t] || c.text.length > 4) return '';
+    const inner = `${logoImg(t)}<span>${esc(c.text)}</span>`;
+    return linkEl ? `<a class="nx-tmab" href="${esc(linkEl.href)}" title="${esc(fullTeamName(t))}">${inner}</a>` : `<span class="nx-tmab" title="${esc(fullTeamName(t))}">${inner}</span>`;
+  }
+
+  // Render a table model as a V1 table. opts: { skipTitle, sortCol (header text), valFirst, badges }
+  function dtHtml(m, opts = {}) {
+    const me = mine();
+    const h0 = m.rows.find((r) => r.kind === 'head');
+    const rankFirst = !h0 || /^(|#|rank|pos)$/i.test(h0.cells[0].text);
+    let firstHead = true, sortIdx = -1;
+    const body = m.rows.map((r) => {
+      if (r.kind === 'title') {
+        if (opts.skipTitle && r === m.rows[0]) return '';
+        return `<tr class="sub"><th colspan="${m.ncols}">${r.logo ? `<img class="nx-logo" src="${esc(r.logo)}" alt="">` : ''}${esc(r.text)}</th></tr>`;
+      }
+      if (r.kind === 'head') {
+        const ths = r.cells.map((c) => {
+          const sorted = opts.sortCol && c.text.toLowerCase() === opts.sortCol.toLowerCase();
+          if (sorted) sortIdx = c.col;
+          return `<th${c.cs > 1 ? ` colspan="${c.cs}"` : ''} class="${c.left ? 'l' : ''}${sorted ? ' sorted' : ''}">${c.html}</th>`;
+        }).join('');
+        const tr = `<tr class="hd${firstHead ? ' first' : ''}">${ths}</tr>`;
+        firstHead = false;
+        return tr;
+      }
+      const links = $$('a', r.el);
+      const isMe = links.some((a) => me.ids.has(teamIdOf(a.getAttribute('href')))) || r.cells.some((c) => me.coaches.has(c.text.toLowerCase()));
+      const tds = r.cells.map((c, i) => {
+        const cellEl = r.el.cells[i];
+        const a = cellEl && cellEl.querySelectorAll('a').length === 1 && norm(cellEl.querySelector('a').textContent) === c.text ? cellEl.querySelector('a') : null;
+        let html = teamCell(c, a) || c.html;
+        const cls = [c.left ? 'l' : ''];
+        if (i === 0 && rankFirst && /^\d+$/.test(c.text) && r.cells.length > 2) cls.push('rk');
+        else if (i === 0 && opts.valFirst && !rankFirst) cls.push('val');
+        if (c.col === sortIdx && c.cs === 1) cls.push('sorted');
+        if (opts.badges && /^(PP|SH|EN|PS|SO)$/.test(c.text)) html = `<span class="nx-s-badge">${esc(c.text)}</span>`;
+        if (/^(Won|W)\s*\d+$/.test(c.text)) cls.push('win'); else if (/^(Lost|L)\s*\d+$/.test(c.text)) cls.push('loss');
+        return `<td${c.cs > 1 ? ` colspan="${c.cs}"` : ''} class="${cls.join(' ').trim()}">${html}</td>`;
+      }).join('');
+      return `<tr class="${isMe ? 'me' : ''}">${tds}</tr>`;
+    }).join('');
+    return `<div class="nx-dt-wrap"><table class="nx-dt">${body}</table></div>`;
+  }
+
+  // Our controls drive the page's own (hidden) dropdowns and page buttons.
+  let ctlSeq = 0;
+  const ctlEls = {};
+  const ctlId = (el) => { const id = 'c' + (++ctlSeq); ctlEls[id] = el; return id; };
+  function selectHtml(b) {
+    return `<label class="nx-s-f"><span class="nx-lab">${esc((b.label || b.el.name).toUpperCase())}</span>
+      <select data-nx-ctl="${ctlId(b.el)}">${[...b.el.options].map((o, i) => `<option value="${i}"${o.selected ? ' selected' : ''}>${esc(norm(o.text))}</option>`).join('')}</select></label>`;
+  }
+  function tabsHtml(b) {
+    return `<div class="nx-s-f">${b.label ? `<span class="nx-lab">${esc(b.label.toUpperCase())}</span>` : ''}
+      <nav class="nx-seg nx-s-tabs"${b.links.key ? ` data-key="${esc(b.links.key)}"` : ''}>${b.links.map((l) => `<a href="${esc(l.href)}"${l.on ? ' class="on" aria-current="page"' : ''}>${esc(l.text)}</a>`).join('')}</nav></div>`;
+  }
+  function pagerHtml(b) {
+    return `<div class="nx-s-pager"><span class="nx-lab">${esc((b.label || 'Page').toUpperCase())}</span>${b.btns.map((x) => {
+      const v = x.value, cur = !x.getAttribute('onclick');
+      return `<button type="button"${cur ? ' class="on" aria-current="page"' : ` data-nx-ctl="${ctlId(x)}"`} aria-label="${v === '>' ? 'Next page' : v === '<' ? 'Previous page' : 'Page ' + esc(v)}">${v === '>' ? '›' : v === '<' ? '‹' : esc(v)}</button>`;
+    }).join('')}</div>`;
+  }
+  function wireCtls(app) {
+    app.addEventListener('change', (e) => {
+      const s = e.target.closest('select[data-nx-ctl]');
+      const orig = s && ctlEls[s.dataset.nxCtl];
+      if (!orig) return;
+      orig.selectedIndex = +s.value;
+      orig.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    app.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-nx-ctl]');
+      if (b && ctlEls[b.dataset.nxCtl]) ctlEls[b.dataset.nxCtl].click();
+    });
+  }
+
+  const STAT_NAMES = { GF: 'Goals For', GA: 'Goals Against', 'GF/G': 'Goals For / Game', 'GA/G': 'Goals Against / Game', PCT: 'Win %', PTS: 'Points', W: 'Wins', L: 'Losses', T: 'Ties' };
+  const cardHtml = (title, meta, body, cls = '') => `<div class="nx-card nx-s-card ${cls}">${title ? `<div class="nx-card-h"><h2>${title}</h2>${meta ? `<span class="nx-meta">${meta}</span>` : ''}</div>` : ''}${body}</div>`;
+
+  // Lay out content blocks as cards. A section heading followed by one table titles that table's card;
+  // one followed by several becomes a heading over a grid of small cards.
+  function blocksHtml(blocks, opts = {}) {
+    let html = '', grid = [], pendingTitle = '', pendingMeta = '', secOpen = false;
+    const flush = () => { if (grid.length) html += `<div class="nx-s-grid">${grid.join('')}</div>`; grid = []; };
+    const tablesAfter = (i) => { let n = 0; for (let j = i + 1; j < blocks.length && !(blocks[j].type === 'h' && blocks[j].level === 'sec'); j++) if (blocks[j].type === 'table') n++; return n; };
+    blocks.forEach((b, i) => {
+      if (b.type === 'h' && b.level === 'sec') {
+        flush();
+        if (tablesAfter(i) === 1) { pendingTitle = b.text; return; }
+        const note = blocks[i + 1] && blocks[i + 1].type === 'text' ? blocks[i + 1].text : '';
+        if (note) blocks[i + 1].used = true;
+        html += `<div class="nx-s-sec"><h2>${esc(b.text)}</h2>${note ? `<span>${esc(note)}</span>` : ''}</div>`;
+        secOpen = true;
+        return;
+      }
+      if (b.type === 'h') { pendingTitle = b.text; return; }
+      if (b.type === 'text' && !b.used && pendingTitle) { pendingMeta = b.text; return; }
+      if (b.type === 'pager') { const last = grid.length ? null : html.lastIndexOf('</div><!--card-->'); if (last != null && last >= 0) html = html.slice(0, last) + `<div class="nx-s-foot">${pagerHtml(b)}</div>` + html.slice(last); return; }
+      if (b.type !== 'table') return;
+      const m = tableModel(b.el);
+      const big = m.rows.length > 14 || m.ncols > 6;
+      let title = pendingTitle, logoSrc = '';
+      const t0 = m.rows[0] && m.rows[0].kind === 'title' ? m.rows[0] : null;
+      if (!title && t0) { title = t0.text; logoSrc = t0.logo; }
+      const firstHead = m.rows.find((r) => r.kind === 'head');
+      if (!title && firstHead) title = STAT_NAMES[firstHead.cells[0].text] || '';
+      if (!title) title = opts.defaultTitle || '';
+      const card = cardHtml(`${logoSrc ? `<img class="nx-logo" src="${esc(logoSrc)}" alt="">` : ''}${esc(title)}`, esc(pendingMeta),
+        dtHtml(m, { skipTitle: !!t0 && (title === t0.text), sortCol: opts.sortCol, badges: opts.badges, valFirst: !big }), big ? 'big' : 'small') + '<!--card-->';
+      pendingTitle = ''; pendingMeta = '';
+      if (big || !secOpen) { flush(); html += card; } else grid.push(card);
+    });
+    flush();
+    return html.replace(/<!--card-->/g, '');
+  }
+
+  // Controls bar: level tabs, dropdowns and "Label: value" facts above the tables.
+  function ctlBarHtml(blocks) {
+    const parts = blocks.map((b) => b.type === 'tabs' ? tabsHtml(b) : b.type === 'select' ? selectHtml(b)
+      : b.type === 'value' ? `<div class="nx-s-f"><span class="nx-lab">${esc(b.label.toUpperCase())}</span><span class="nx-s-val">${esc(b.text)}</span></div>` : '').filter(Boolean);
+    return parts.length ? `<div class="nx-s-bar">${parts.join('')}</div>` : '';
+  }
+
+  // Shared hero for stats pages (the same colour band as the coach and home pages).
+  function statHeroHtml({ eyebrow, title, sub, logo: lg, side, actions, bar }) {
+    return `<section class="nx-hero nx-s-hero"><div class="nx-hero-in">
+      ${lg ? `<div class="nx-hero-logo"><img src="${esc(lg)}" alt=""></div>` : ''}
+      <div class="nx-hero-txt">
+        ${eyebrow ? `<div class="nx-eyebrow">${esc(eyebrow.toUpperCase())}</div>` : ''}
+        <h1 class="nx-team">${esc(title)}</h1>
+        ${sub ? `<div class="nx-s-sub">${sub}</div>` : ''}
+        ${actions ? `<div class="nx-actions">${actions}</div>` : ''}
+      </div>
+      ${side || ''}
+    </div>${bar || ''}</section>`;
+  }
+
+  let statReady = false;
+  function statSetup() {
+    v1Setup();
+    if (statReady) return;
+    statReady = true;
+    addCss(`
+    .nx-s-hero .nx-team { font-size: clamp(30px, 4.4vw, 50px); margin-bottom: 6px; }
+    .nx-s-hero .nx-statbar { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); }
+    .nx-s-sub { font-size: 14px; color: rgba(255,255,255,.86); max-width: 720px; }
+    .nx-s-sub p { margin: 6px 0 0; }
+    .nx-s-sub a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+    .nx-s-hero .nx-hero-logo img[src*="logos150"] { width: 100px; height: 100px; }
+    .nx-s-hero .nx-actions select { color: #fff; background-color: rgba(0,0,0,.4); border-color: rgba(255,255,255,.3); min-height: 38px; font-weight: 600; }
+    .nx-s-hero .nx-actions .nx-lab { color: rgba(255,255,255,.75); }
+    .nx-s-hero .nx-actions select option { color: #111; background: #fff; }
+    .nx-s-hero .nx-hero-rank .who { font-family: var(--nx-cond); font-size: 15px; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; color: #fff; }
+
+    .nx-s-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; margin-top: 18px; padding: 12px 16px; background: var(--nx-card);
+      border: 1px solid var(--nx-line); border-radius: 10px; box-shadow: var(--nx-shadow); }
+    .nx-s-f { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+    .nx-s-f .nx-lab { margin: 0; font-size: 8px; color: var(--nx-mute); }
+    .nx-s-f select { min-height: 36px; font-weight: 600; max-width: 100%; }
+    .nx-s-val { font: 600 15px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; color: var(--nx-acc); }
+    .nx-s-tabs { flex-wrap: wrap; }
+    .nx-s-tabs a { font: 600 12px var(--nx-cond); text-transform: uppercase; letter-spacing: 1px; color: var(--nx-mute); padding: 6px 12px; border-radius: 4px; }
+    .nx-s-tabs a:hover { color: var(--nx-strong); }
+    .nx-s-tabs a.on { background: var(--nx-red); color: var(--nx-on-red); }
+
+    .nx-s-sec { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin: 28px 0 12px; }
+    .nx-s-sec h2 { margin: 0; display: flex; align-items: center; gap: 12px; font: 600 22px var(--nx-cond); text-transform: uppercase; letter-spacing: 1.5px; color: var(--nx-strong); }
+    .nx-s-sec h2::before { content: ""; width: 5px; height: 22px; background: var(--nx-red); box-shadow: 6px 0 0 var(--nx-gold); margin-right: 6px; }
+    .nx-v1[data-nx-theme="day"] .nx-s-sec h2 { color: #10264d; }
+    .nx-s-sec span { font-size: 12px; color: var(--nx-mute); }
+    .nx-v1[data-nx-theme="day"] .nx-s-sec span { color: #1B2F55; }
+    .nx-s-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px; align-items: start; }
+    .nx-s-grid .nx-card + .nx-card { margin-top: 0; }
+    .nx-main > .nx-s-card, .nx-s-cols > div > .nx-card:first-child { margin-top: 18px; }
+    .nx-s-card .nx-card-h h2 .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; }
+    .nx-s-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; align-items: start; }
+    @media (max-width: 1000px) { .nx-s-cols { grid-template-columns: minmax(0, 1fr); } }
+    .nx-s-foot { display: flex; justify-content: flex-end; padding: 10px 14px; border-top: 1px solid var(--nx-line); background: var(--nx-bg2); }
+    .nx-s-pager { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .nx-s-pager .nx-lab { margin-right: 6px; font-size: 8px; color: var(--nx-mute); }
+    .nx-s-pager button { min-width: 34px; height: 32px; padding: 0 8px; font: 600 14px var(--nx-cond); color: var(--nx-text); background: var(--nx-card2);
+      border: 1px solid var(--nx-line2); border-radius: 4px; cursor: pointer; }
+    .nx-s-pager button:hover { border-color: var(--nx-acc); color: var(--nx-acc); }
+    .nx-s-pager button.on { background: var(--nx-red); border-color: var(--nx-red); color: var(--nx-on-red); cursor: default; }
+    .nx-s-intro { margin-top: 18px; padding: 12px 16px; font-size: 13px; color: var(--nx-text); background: var(--nx-card); border: 1px solid var(--nx-line2);
+      border-left: 4px solid var(--nx-red); border-radius: 10px; box-shadow: var(--nx-shadow); }
+    .nx-s-intro p { margin: 0; } .nx-s-intro p + p { margin-top: 6px; }
+
+    /* ---------- Stats tables ---------- */
+    .nx-dt-wrap { overflow-x: auto; }
+    table.nx-dt { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+    table.nx-dt th { background: var(--nx-thead); color: var(--nx-mute); font: 500 11px var(--nx-cond); text-transform: uppercase; letter-spacing: 1.2px;
+      padding: 8px 9px; border-bottom: 2px solid var(--nx-red); text-align: center; vertical-align: bottom; white-space: nowrap; }
+    table.nx-dt th abbr { text-decoration: none; cursor: help; }
+    table.nx-dt th a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+    table.nx-dt th a:hover { color: var(--nx-acc); }
+    table.nx-dt th.sorted { color: var(--nx-acc); border-bottom-color: var(--nx-gold); }
+    table.nx-dt tr.hd:not(.first) th { border-top: 6px solid var(--nx-card); }
+    table.nx-dt tr.sub th { text-align: left; font: 600 14px var(--nx-cond); letter-spacing: 1.5px; color: var(--nx-strong); padding: 9px 12px;
+      background: linear-gradient(90deg, var(--nx-grp1), var(--nx-card) 75%); border-bottom: 1px solid var(--nx-line2); }
+    table.nx-dt tr.sub th .nx-logo { width: 22px; height: 22px; image-rendering: pixelated; vertical-align: middle; margin-right: 8px; }
+    table.nx-dt td { padding: 6px 9px; border-bottom: 1px solid var(--nx-line); text-align: center; white-space: nowrap; }
+    table.nx-dt .l { text-align: left; }
+    .nx-s-card.small table.nx-dt td.l:not(:has(a)) { white-space: normal; }
+    table.nx-dt tr:not(.hd):not(.sub):nth-child(even) td { background: var(--nx-row-away); }
+    table.nx-dt tr:not(.hd):not(.sub):hover td { background: var(--nx-hover); }
+    table.nx-dt tr.me td { background: var(--nx-me) !important; }
+    table.nx-dt tr.me td:first-child { box-shadow: inset 4px 0 0 var(--nx-gold); }
+    table.nx-dt td.val { font: 600 17px var(--nx-cond); color: var(--nx-strong); }
+    table.nx-dt tr:first-child + tr td.val, table.nx-dt tr.hd + tr td.val { color: var(--nx-acc); }
+    table.nx-dt td.rk { width: 1%; font-family: var(--nx-px); font-size: 8px; color: var(--nx-dim); }
+    table.nx-dt td.sorted { font-weight: 700; color: var(--nx-strong); background-image: linear-gradient(color-mix(in srgb, var(--nx-gold) 9%, transparent), color-mix(in srgb, var(--nx-gold) 9%, transparent)); }
+    table.nx-dt td.win { color: var(--nx-win); font-weight: 600; } table.nx-dt td.loss { color: var(--nx-loss); font-weight: 600; }
+    .nx-v1[data-nx-theme="day"] table.nx-dt td.win { color: #13803f; } .nx-v1[data-nx-theme="day"] table.nx-dt td.loss { color: #c3192b; }
+    table.nx-dt td a { color: var(--nx-acc); font-weight: 600; }
+    table.nx-dt td a:hover { text-decoration: underline; text-underline-offset: 2px; }
+    table.nx-dt .nx-logo { width: 20px; height: 20px; image-rendering: pixelated; vertical-align: middle; }
+    .nx-tmab { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--nx-text) !important; }
+    a.nx-tmab:hover span { color: var(--nx-acc); }
+    .nx-s-badge { display: inline-block; font: 600 10px var(--nx-cond); letter-spacing: 1px; padding: 1px 6px; border-radius: 3px; background: var(--nx-gold); color: var(--nx-on-gold); }
+    `);
+  }
+
+  // Mount a stats page: palette, controls wiring, and the original page title kept for the tab.
+  function statMount(html, palette) {
+    const app = v1Mount(html);
+    applyPalette(app, palette || HOME_PALETTE);
+    wireCtls(app);
+    // The page's own level tabs replace the league bar's level picker (one way to switch, not two).
+    // A box score's sidebar shows a default level, not the game's, so it gets no level picker either.
+    if ($('.nx-s-tabs[data-key="sublg"]', app) || PAGE === 'boxscore') { const lv = $('.nx-lgbar-f.lv', app); if (lv) lv.remove(); }
+    return app;
+  }
+  const levelTitle = (lv) => lv || 'All Levels';
+  const heroSideMine = (team, label) => team ? `<div class="nx-hero-rank"><div class="lab">★ MY TEAM</div><div class="who">${esc(team)}</div>${label ? `<div class="lab">${esc(label)}</div>` : ''}</div>` : '';
+
+  // ---------- V1 · Standings ----------
+  function renderStandingsV1() {
+    statSetup();
+    const B = scrapeContent();
+    const info = (B.find((b) => b.type === 'text' && /League:/.test(b.text)) || {}).text || '';
+    const pick = (re) => (info.match(re) || [])[1] || '';
+    const lgTxt = pick(/League:\s*(.*?)\s*Level:/) || leagueName;
+    const lvTxt = pick(/Level:\s*(.*?)\s*(League Description:|$)/) || curLevel;
+    const desc = pick(/League Description:\s*(.*)$/);
+    const me = mine();
+    let conf = '', myRow = null;
+    const cards = [];
+    B.filter((b) => b.type === 'table').forEach((b) => {
+      const t = b.el;
+      if (t.rows.length === 1) { const c = norm(t.textContent); if (/Conference|League/i.test(c)) conf = c; return; }
+      let pos = 0, div = '', rows0 = 0, ptsAt = 3;
+      const rows = [...t.rows].map((r) => {
+        const cells = [...r.cells];
+        if (cells.every((c) => /white_bold/.test(c.className) || c.hasAttribute('background'))) {
+          div = norm(cells[0].textContent); pos = 0;
+          ptsAt = cells.slice(2).findIndex((c) => /^PTS$/i.test(norm(c.textContent)));
+          return `<tr class="hd${rows0++ ? '' : ' first'}"><th></th><th class="l">${esc(div)}</th>${cells.slice(2).map((c) => {
+            const a = c.querySelector('a'), sorted = a && qp('sort') && new URL(a.href, location.href).searchParams.get('sort') === qp('sort');
+            return `<th class="${sorted ? 'sorted' : ''}${/^PTS$/i.test(norm(c.textContent)) ? ' pts' : ''}">${richText(c)}</th>`;
+          }).join('')}</tr>`;
+        }
+        if (cells.length < 5) return '';
+        pos++;
+        const team = resolveTeam(cells[2].textContent, div), coachA = cells[3].querySelector('a'), coach = norm(cells[3].textContent);
+        const href = coachA ? coachA.href : (teamInfo[team] || {}).href || '#';
+        const isMe = me.ids.has(teamIdOf(href));
+        if (isMe) myRow = { team, pos, div };
+        const stats = cells.slice(4).map((c, i) => {
+          const v = norm(c.textContent);
+          const cls = i === ptsAt ? 'pts' : /^Won [1-9]/.test(v) ? 'win' : /^Lost [1-9]/.test(v) ? 'loss' : '';
+          return `<td class="${cls}">${esc(v.replace(/^Won /, 'W').replace(/^Lost /, 'L').replace(/^Tied? /, 'T'))}</td>`;
+        }).join('');
+        return `<tr class="${isMe ? 'me' : ''}"><td class="rk">${pos}</td><td class="l"><a class="nx-tmcell" href="${esc(href)}">${logoImg(team)}
+          <span><div class="n">${esc(team)}</div><div class="c">${esc(coach)}</div></span></a></td>${stats}</tr>`;
+      });
+      cards.push(cardHtml(esc(conf || 'Standings'), esc(levelTitle(curLevel)), `<div class="nx-dt-wrap"><table class="nx-dt nx-s-st">${rows.join('')}</table></div>`, 'big'));
+    });
+    const tabs = B.find((b) => b.type === 'tabs');
+    addCss(`
+    table.nx-s-st td.pts { font: 600 15px var(--nx-cond); color: var(--nx-strong); }
+    table.nx-s-st th.pts { color: var(--nx-acc); }
+    table.nx-s-st .nx-tmcell .nx-logo { width: 24px; height: 24px; }
+    table.nx-s-st .nx-tmcell .c { color: var(--nx-acc); font-weight: 600; }
+    table.nx-s-st tr.hd th:nth-child(2) { font: 600 14px var(--nx-cond); letter-spacing: 1.5px; color: var(--nx-strong); }
+    `);
+    return statMount(`
+      ${statHeroHtml({ eyebrow: `Standings · ${lgTxt}`, title: lvTxt || 'Standings', sub: desc ? esc(desc) : '',
+        side: myRow ? heroSideMine(myRow.team, `${ordinal(myRow.pos)} in ${myRow.div}`) : '' })}
+      ${tabs ? `<div class="nx-s-bar">${tabsHtml({ ...tabs, label: 'Level' })}</div>` : ''}
+      ${cards.join('') || '<div class="nx-card nx-s-card"><div class="nx-empty">No standings for this level yet.</div></div>'}
+    `);
+  }
+
+  // "Player Statistics Leaders - Classic '94-2026 Fall - GENS-A Season" -> title + eyebrow
+  const splitHeading = (t) => { const p = (t || '').split(/\s+-\s+/); return { title: p[0] || '', rest: p.slice(1).join(' · ') }; };
+
+  // ---------- V1 · Team roster ----------
+  function renderRosterV1() {
+    statSetup();
+    const B = scrapeContent();
+    const teamH = B.find((b) => b.type === 'h' && b.level === 'team');
+    const team = teamH ? teamFromFull(teamH.text) : '';
+    const head = splitHeading((B.find((b) => b.type === 'h' && b.level === 'sec') || {}).text);
+    const lg = B.find((b) => b.type === 'logo');
+    const statsB = B.find((b) => b.type === 'table' && /^GP W L T/.test(firstRowText(b.el)));
+    let bar = '';
+    if (statsB && statsB.el.rows[1]) {
+      const ks = [...statsB.el.rows[0].cells].map((c) => norm(c.textContent)), vs = [...statsB.el.rows[1].cells].map((c) => norm(c.textContent));
+      bar = `<div class="nx-statbar">${ks.map((k, i) => {
+        const v = vs[i] || '', n = parseFloat(v), cls = k === 'GDIF' && n ? (n > 0 ? 'pos' : 'neg') : '';
+        return `<div class="nx-stat"><div class="k">${esc(k)}</div><div class="v ${cls}">${esc(k === 'GDIF' && n > 0 ? '+' + v : v || '–')}</div></div>`;
+      }).join('')}</div>`;
+    }
+    const teamSel = B.find((b) => b.type === 'select' && b.el.name === 'id');
+    const info = teamInfo[team] || {};
+    const used = new Set([teamH, statsB, teamSel, lg].filter(Boolean));
+    const cut = statsB ? B.indexOf(statsB) + 1 : B.findIndex((b) => b.type === 'table');
+    const ctl = B.slice(0, cut).filter((b) => !used.has(b) && /^(tabs|select)$/.test(b.type));
+    const body = B.slice(Math.max(cut, 0)).filter((b) => !used.has(b));
+    return statMount(`
+      ${statHeroHtml({ eyebrow: head.rest || 'Team Roster', title: teamH ? teamH.text : 'Team Roster', logo: lg ? lg.src : (team ? logo(team, 100) : ''),
+        sub: info.coach ? `<div class="nx-coach">Coach <b>${esc(info.coach)}</b>${dcSlot(info.coach)}</div>` : '',
+        actions: (teamSel ? selectHtml({ ...teamSel, label: 'Team' }) : '')
+          + (info.href ? `<a class="nx-btn gold" href="${esc(info.href)}"><span>Coach Page</span></a>` : ''),
+        bar })}
+      ${ctlBarHtml(ctl)}
+      ${blocksHtml(body, { defaultTitle: 'Roster' })}
+    `, team ? teamPalette(team) : HOME_PALETTE);
+  }
+
+  // ---------- V1 · Lists: player leaders, all-time user standings, league records, site records ----------
+  const LIST_PAGES = {
+    players: { heroHeading: true, defaultTitle: 'Player Stats Leaders', sortSel: 'sort' },
+    allstats: { heroHeading: true, defaultTitle: 'All-Time Standings', sortVal: true, eyebrow: 'Site Stats · All-time' },
+    records: { title: 'League Records', eyebrow: () => [leagueName, curLevel].filter(Boolean).join(' · ') },
+    siterecords: { title: 'Site Records', eyebrow: (tab) => 'All-time' + (tab ? ' · ' + tab : '') },
+  };
+  function renderListV1(kind) {
+    statSetup();
+    const cfg = LIST_PAGES[kind];
+    const B = scrapeContent();
+    const heroH = cfg.heroHeading ? B.find((b) => b.type === 'h') : null;
+    const firstSec = B.findIndex((b) => b.type === 'h' && b !== heroH);
+    const firstTable = B.findIndex((b) => b.type === 'table');
+    const cut = [firstSec, firstTable].filter((i) => i >= 0).reduce((a, b) => Math.min(a, b), B.length);
+    const head = B.slice(0, cut), pagers = B.filter((b) => b.type === 'pager');
+    const body = B.slice(cut).filter((b) => b.type !== 'pager');
+    // Page buttons go under the last table, wherever the original put them.
+    let lastT = -1;
+    body.forEach((b, i) => { if (b.type === 'table') lastT = i; });
+    if (lastT >= 0) body.splice(lastT + 1, 0, ...pagers);
+    const intro = head.filter((b) => b.type === 'text');
+    const ctl = head.filter((b) => /^(tabs|select|value)$/.test(b.type));
+    const sortSel = cfg.sortSel && ctl.find((b) => b.type === 'select' && b.el.name === cfg.sortSel);
+    const sortVal = cfg.sortVal && ctl.find((b) => b.type === 'value' && /sort/i.test(b.label || ''));
+    const sortCol = sortSel ? norm((sortSel.el.options[sortSel.el.selectedIndex] || {}).text).replace(/\s*[↑↓]$/, '')
+      : sortVal ? sortVal.text.replace(/\s*[↑↓]$/, '') : '';
+    const onTab = ((ctl.find((b) => b.type === 'tabs') || { links: [] }).links.find((l) => l.on) || {}).text || '';
+    const h = splitHeading(heroH && heroH.text);
+    const eyebrow = typeof cfg.eyebrow === 'function' ? cfg.eyebrow(onTab) : cfg.eyebrow || h.rest || leagueName;
+    return statMount(`
+      ${statHeroHtml({ eyebrow, title: cfg.title || h.title || cfg.defaultTitle, sub: intro.map((b) => `<p>${b.html}</p>`).join('') })}
+      ${ctlBarHtml(ctl)}
+      ${blocksHtml(body, { defaultTitle: cfg.defaultTitle, sortCol })}
+    `);
+  }
+
+  // ---------- V1 · Box score ----------
+  function renderBoxScoreV1() {
+    statSetup();
+    const B = scrapeContent();
+    const T = B.filter((b) => b.type === 'table').map((b) => b.el);
+    const titled = (re) => T.find((t) => re.test(norm(t.rows[0].textContent)));
+    const gs = titled(/^Game Stats$/);
+    if (!gs) return renderListV1Generic(B);
+    const line = T.find((t) => /box_table/.test(t.className));
+    const per = titled(/^Period Stats/), scoring = titled(/^Scoring Summary/), pens = titled(/^Penalty Summary/);
+    const players = T.filter((t) => /Player Stats/.test(norm(t.rows[0].textContent)));
+    const subm = norm((T.find((t) => /Game Submitted by/i.test(t.textContent)) || {}).textContent || '').replace(/^Game Submitted by:\s*/i, '');
+    const vals = (r) => [...r.cells].map((c) => norm(c.textContent));
+    const gr = [...gs.rows];
+    const names = vals(gr[1]);
+    const logos = B.filter((b) => b.type === 'logo');
+    const side = (i) => {
+      const nm = i ? names[names.length - 1] : names[0];
+      const team = TEAMS[nm] ? nm : teamFromFull((logos[i] || {}).alt || nm);
+      return { team, name: nm };
+    };
+    const A = side(0), H = side(1);
+    const row = (label) => gr.find((r) => r.cells.length === 3 && norm(r.cells[1].textContent) === label);
+    const coachR = row('Coach'), scoreR = row('Score');
+    A.coach = coachR ? vals(coachR)[0] : ''; H.coach = coachR ? vals(coachR)[2] : '';
+    A.goals = scoreR ? +vals(scoreR)[0] : 0; H.goals = scoreR ? +vals(scoreR)[2] : 0;
+    [A, H].forEach((s) => {
+      const t = Object.keys(teamInfo).find((k) => teamInfo[k].coach === s.coach);
+      s.href = t ? teamInfo[t].href : '';
+      s.logo = TEAMS[s.team] ? logo(s.team, 100) : (logos[s === A ? 0 : 1] || {}).src || '';
+      s.color = TEAM_COLORS[s.team] ? (lum(TEAM_COLORS[s.team][0]) < 0.01 ? mixHex(TEAM_COLORS[s.team][1], '#000000', 0.45) : TEAM_COLORS[s.team][0]) : '#3366CC';
+      const c = TEAM_COLORS[s.team] || ['#3366CC', '#9B0000'];
+      s.bar = (bg) => contrast(c[0], bg) >= 2 ? c[0] : contrast(c[1], bg) >= 2 ? c[1] : readableOn(bg, c[0], 2.5);
+    });
+    const winner = A.goals > H.goals ? A : H.goals > A.goals ? H : null;
+    const lineRows = line ? [...line.rows].map(vals) : [];
+    const ot = lineRows[0] && lineRows[0].length > 4;
+    const linescore = lineRows.length ? `<table class="nx-bx-line"><tr>${lineRows[0].map((c, i) => `<th>${i ? esc(c) : ''}</th>`).join('')}<th>T</th></tr>
+      ${lineRows.slice(1).map((r, i) => `<tr>${r.map((c, j) => `<td>${j ? esc(c) : `${logoImg((i ? H : A).team)}${esc(c)}`}</td>`).join('')}<td class="t">${(i ? H : A).goals}</td></tr>`).join('')}</table>` : '';
+    const teamHtml = (s, cls) => {
+      const nick = (TEAMS[s.team] || [])[1] || '';
+      const inner = `<div class="nx-hero-logo"><img src="${esc(s.logo)}" alt=""></div>
+        <div class="nm">${esc(s.team || s.name)}</div>${nick ? `<div class="nk">${esc(nick)}</div>` : ''}`;
+      return `<div class="nx-bx-tm ${cls}${winner === s ? ' win' : winner ? ' lose' : ''}">
+        ${s.href ? `<a href="${esc(s.href)}" title="${esc(s.coach)}'s coach page">${inner}</a>` : inner}
+        <div class="co">${esc(s.coach)}${dcSlot(s.coach)}</div></div>`;
+    };
+    // Game stats: away | label + split bar | home
+    const num = (v) => { const m = /^(\d+):(\d+)$/.exec(v); if (m) return +m[1] * 60 + +m[2]; const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const cmp = gr.filter((r) => r.cells.length === 3 && !/^(Coach|Score|vs\.?)$/i.test(norm(r.cells[1].textContent)) && norm(r.cells[1].textContent)).map((r) => {
+      const [a, label, h] = vals(r), na = num(a), nh = num(h), tot = na + nh;
+      return `<div class="nx-bx-row"><span class="v a${na > nh ? ' lead' : ''}">${esc(a)}</span>
+        <div class="mid"><div class="lab">${esc(label)}</div><div class="bars${tot ? '' : ' none'}"><i class="a" style="flex:${tot ? na : 1}"></i><i class="h" style="flex:${tot ? nh : 1}"></i></div></div>
+        <span class="v h${nh > na ? ' lead' : ''}">${esc(h)}</span></div>`;
+    }).join('');
+    const tblCard = (t, title, opts = {}) => (t ? cardHtml(title, opts.meta || '', dtHtml(tableModel(t), { skipTitle: true, badges: true })) : '');
+    const teamTitle = (s) => `${logoImg(s.team)}${esc(fullTeamName(s.team) || s.name)}`;
+    addCss(`
+    .nx-bx-hero { background: linear-gradient(100deg, var(--bx-ah) 0%, color-mix(in srgb, var(--bx-ah) 40%, #06080f) 30%, #06080f 50%, color-mix(in srgb, var(--bx-hh) 40%, #06080f) 70%, var(--bx-hh) 100%); }
+    .nx-bx-sb { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 20px; padding: 26px 30px 18px; }
+    .nx-bx-tm { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; min-width: 0; }
+    .nx-bx-tm > a { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .nx-bx-tm .nx-hero-logo { width: 116px; height: 116px; margin-bottom: 8px; }
+    .nx-bx-tm .nm { font: 700 clamp(22px, 3vw, 34px)/1 var(--nx-cond); text-transform: uppercase; letter-spacing: 1px; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.35); }
+    .nx-bx-tm .nk { font: 500 15px var(--nx-cond); text-transform: uppercase; letter-spacing: 2px; color: rgba(255,255,255,.75); }
+    .nx-bx-tm .co { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; font: 600 15px var(--nx-cond);
+      letter-spacing: 1px; text-transform: uppercase; color: var(--nx-acc-n); }
+    .nx-bx-tm.lose .nx-hero-logo { box-shadow: 0 0 0 3px rgba(255,255,255,.25); }
+    .nx-bx-tm.lose .nx-hero-logo img { filter: grayscale(.5) brightness(.85); }
+    .nx-bx-tm.lose .nm { color: rgba(255,255,255,.7); }
+    .nx-bx-tm > a:hover .nm { color: var(--nx-acc-n); }
+    .nx-bx-mid { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .nx-bx-score { display: flex; align-items: center; gap: 14px; font-family: var(--nx-px); font-size: clamp(34px, 5vw, 56px); color: rgba(255,255,255,.55);
+      padding: 14px 22px; background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.15); border-radius: 6px; text-shadow: 4px 4px 0 rgba(0,0,0,.6); }
+    .nx-bx-score b { font-weight: 400; } .nx-bx-score b.w { color: #fff; } .nx-bx-score span { font-size: .5em; }
+    table.nx-bx-line { border-collapse: collapse; font-size: 13px; background: rgba(0,0,0,.45); border-radius: 4px; overflow: hidden; font-variant-numeric: tabular-nums; }
+    table.nx-bx-line th { font: 500 11px var(--nx-cond); letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,.65); padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,.15); }
+    table.nx-bx-line td { padding: 4px 10px; text-align: center; color: #fff; }
+    table.nx-bx-line td:first-child { text-align: left; font-weight: 600; white-space: nowrap; }
+    table.nx-bx-line td:first-child .nx-logo { width: 18px; height: 18px; image-rendering: pixelated; vertical-align: middle; margin-right: 6px; }
+    table.nx-bx-line td.t { font-family: var(--nx-px); font-size: 10px; color: var(--nx-acc-n); border-left: 1px solid rgba(255,255,255,.15); }
+    .nx-bx-meta { position: relative; z-index: 1; padding: 9px 30px; font-size: 12px; color: rgba(255,255,255,.75); background: rgba(0,0,0,.45); border-top: 1px solid rgba(255,255,255,.1); text-align: center; }
+    @media (max-width: 700px) {
+      .nx-bx-sb { grid-template-columns: 1fr 1fr; padding: 18px; }
+      .nx-bx-mid { grid-column: 1 / -1; order: 3; }
+      .nx-bx-tm .nx-hero-logo { width: 80px; height: 80px; } .nx-bx-tm .nx-hero-logo img { width: 64px; height: 64px; }
+    }
+    .nx-bx { --bx-a: var(--bx-a-n); --bx-h: var(--bx-h-n); }
+    .nx-v1[data-nx-theme="day"] .nx-bx { --bx-a: var(--bx-a-d); --bx-h: var(--bx-h-d); }
+    .nx-bx-keys { display: flex; justify-content: space-between; padding: 10px 16px 0; font: 600 13px var(--nx-cond); letter-spacing: 1px; text-transform: uppercase; color: var(--nx-mute); }
+    .nx-bx-keys span { display: inline-flex; align-items: center; gap: 6px; }
+    .nx-bx-keys .nx-logo { width: 20px; height: 20px; image-rendering: pixelated; }
+    .nx-bx-rows { padding: 6px 16px 14px; }
+    .nx-bx-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 92px; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--nx-line); }
+    .nx-bx-row:last-child { border-bottom: 0; }
+    .nx-bx-row .v { font: 500 16px var(--nx-cond); color: var(--nx-mute); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .nx-bx-row .v.h { text-align: right; }
+    .nx-bx-row .v.lead { color: var(--nx-strong); font-weight: 700; }
+    .nx-bx-row .lab { text-align: center; font: 500 11px var(--nx-cond); letter-spacing: 1.3px; text-transform: uppercase; color: var(--nx-mute); margin-bottom: 5px; }
+    .nx-bx-row .bars { display: flex; gap: 3px; height: 8px; }
+    .nx-bx-row .bars i { display: block; min-width: 3px; border-radius: 1px; }
+    .nx-bx-row .bars i.a { background: var(--bx-a); } .nx-bx-row .bars i.h { background: var(--bx-h); }
+    .nx-bx-row .bars.none i { background: var(--nx-line2); }
+    @media (max-width: 500px) { .nx-bx-row { grid-template-columns: 70px minmax(0, 1fr) 70px; gap: 8px; } }
+    `);
+    const app = statMount(`
+      <section class="nx-hero nx-bx-hero" style="--bx-ah:${A.color};--bx-hh:${H.color}">
+        <div class="nx-bx-sb">
+          ${teamHtml(A, 'away')}
+          <div class="nx-bx-mid">
+            <div class="nx-eyebrow">${winner ? 'FINAL' : 'FINAL · TIE'}${ot ? ' · OT' : ''}</div>
+            <div class="nx-bx-score" aria-label="${esc(`${A.team} ${A.goals}, ${H.team} ${H.goals}`)}"><b class="${winner === A ? 'w' : ''}">${A.goals}</b><span>-</span><b class="${winner === H ? 'w' : ''}">${H.goals}</b></div>
+            ${linescore}
+          </div>
+          ${teamHtml(H, 'home')}
+        </div>
+        ${subm ? `<div class="nx-bx-meta">Game logged by ${esc(subm)}</div>` : ''}
+      </section>
+      <div class="nx-s-cols">
+        <div>
+          <div class="nx-card nx-s-card nx-bx" style="--bx-a-n:${A.bar('#141C2F')};--bx-a-d:${A.bar('#FFFFFF')};--bx-h-n:${H.bar('#141C2F')};--bx-h-d:${H.bar('#FFFFFF')}">
+            <div class="nx-card-h"><h2>Game Stats</h2><span class="nx-meta">Away · Home</span></div>
+            <div class="nx-bx-keys"><span>${logoImg(A.team)}${esc(A.team)}</span><span>${esc(H.team)}${logoImg(H.team)}</span></div>
+            <div class="nx-bx-rows">${cmp}</div>
+          </div>
+        </div>
+        <div>
+          ${tblCard(scoring, 'Scoring Summary')}
+          ${tblCard(pens, 'Penalty Summary')}
+          ${tblCard(per, 'Period Stats', { meta: 'Goals-Shots' })}
+        </div>
+      </div>
+      <div class="nx-s-cols">
+        ${players.map((t, i) => `<div>${cardHtml(teamTitle(i ? H : A), 'Player Stats', dtHtml(tableModel(t), { skipTitle: true }))}</div>`).join('')}
+      </div>
+    `, winner ? teamPalette(winner.team) : HOME_PALETTE);
+    return app;
+  }
+  // A page we only partly understand still gets the V1 look: hero + every block as cards.
+  function renderListV1Generic(B) {
+    const h = B.find((b) => b.type === 'h');
+    return statMount(`${statHeroHtml({ eyebrow: leagueName, title: h ? h.text : document.title })}${ctlBarHtml(B.filter((b) => /^(tabs|select|value)$/.test(b.type)))}
+      ${blocksHtml(B.filter((b) => b !== h && !/^(tabs|select|value)$/.test(b.type)))}`);
+  }
+
+  // ============================================================
   // Coach Discord chips + the retro Settings screen (⚙ in the VIEW switcher)
   // ------------------------------------------------------------
   // A chip next to a coach name opens their Discord, or lets you link it.
@@ -2508,7 +3185,10 @@
   // ============================================================
   const ALL_VERSIONS = [
     { id: 'classic', label: 'Classic', title: 'Original nhl94online.com page' },
-    { id: 'v1', label: 'V1', title: 'V1 · Rink Night', pages: { coach: renderCoachV1, home: renderHomeV1 } },
+    { id: 'v1', label: 'V1', title: 'V1 · Rink Night', pages: {
+      coach: renderCoachV1, home: renderHomeV1, standings: renderStandingsV1, roster: renderRosterV1, boxscore: renderBoxScoreV1,
+      records: () => renderListV1('records'), players: () => renderListV1('players'), allstats: () => renderListV1('allstats'), siterecords: () => renderListV1('siterecords'),
+    } },
   ];
   // Only offer versions that have a design for this page.
   const VERSIONS = ALL_VERSIONS.filter((v) => !v.pages || v.pages[PAGE]).map((v) => ({ ...v, render: v.pages && v.pages[PAGE] }));
