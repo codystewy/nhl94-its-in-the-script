@@ -1010,11 +1010,15 @@
     const help = $('.nx-ml-help', app);
     help.hidden = !(store.get('mlIntro', false) || myLeagues.all().length);
     help.addEventListener('click', (e) => { e.stopPropagation(); setOpen(false); mlIntro(app); });
-    // First visit: the puck intro, once per browser. Settings › "Show again" stores false to replay it even with leagues saved.
-    const introFlag = store.get('mlIntro', null);
-    if (introFlag === false || (introFlag == null && !myLeagues.all().length)) {
+    if (mlIntroDue()) {
       setTimeout(() => { if (app.classList.contains('nx-active') && !$('.nx-mli') && !$('.nx-modal:not([hidden])')) { setOpen(false); mlIntro(app); } }, 1200);
     }
+  }
+
+  // First visit: the puck intro, once per browser. Settings › "Show again" stores false to replay it even with leagues saved.
+  function mlIntroDue() {
+    const f = store.get('mlIntro', null);
+    return f === false || (f == null && !myLeagues.all().length);
   }
 
   // ---------- My Leagues: puck + smash effects ----------
@@ -1544,6 +1548,9 @@
       document.addEventListener('nx:myleagues', paintAdd);
       paintAdd();
     }
+    if (dcIntroDue()) {
+      setTimeout(() => { if (app.classList.contains('nx-active') && !$('.nx-mli') && !$('.nx-modal:not([hidden])') && !$('.nx-set')) dcIntro(app); }, 1500);
+    }
 
     if (!games.length) return app;
 
@@ -1814,7 +1821,7 @@
   // ============================================================
   const DC_ICON = '<svg viewBox="0 0 8 7" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" '
     + 'd="M1 0h6v1h1v4h-1v1h-2l-2 1v-1h-2v-1h-1v-4h1zM2 2h1v2h-1zM5 2h1v2h-1z"/></svg>';
-  // Inner HTML of a .nx-dc-slot: "Chat" when the coach has a link, otherwise a quiet "+" to add one.
+  // Inner HTML of a .nx-dc-slot: "Chat" when the coach has a link, otherwise "+ DM" to add one.
   function dcInner(coach, full) {
     const l = coachLinks.get(coach), n = esc(coach);
     if (l) {
@@ -1822,7 +1829,7 @@
       return `<a class="nx-dc on" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" title="${dm ? `Open your Discord DM with ${n}` : `Opens ${n}'s Discord profile. Press ✎ to swap in a DM link.`}">${DC_ICON}<span>${dm ? 'Chat' : 'Profile'}</span></a>`
         + `<button type="button" class="nx-dc-edit" data-dc-link title="Change ${n}'s Discord link" aria-label="Change ${n}'s Discord link">✎</button>`;
     }
-    return `<button type="button" class="nx-dc add" data-dc-link title="Link ${n}'s Discord" aria-label="Link ${n}'s Discord">${DC_ICON}<span>${full ? '+ Discord' : '+'}</span></button>`;
+    return `<button type="button" class="nx-dc add" data-dc-link title="Link ${n}'s Discord DM" aria-label="Link ${n}'s Discord DM">${DC_ICON}<span>${full ? '+ Discord DM' : '+ DM'}</span></button>`;
   }
   const dcSlot = (coach, full) => (coach ? `<span class="nx-dc-slot" data-coach="${esc(coach)}"${full ? ' data-full="1"' : ''}>${dcInner(coach, full)}</span>` : '');
 
@@ -1838,15 +1845,18 @@
     }
     addCss(`
     .nx-dc-slot { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; vertical-align: middle; }
-    .nx-dc { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; font: 400 8px/1 "Press Start 2P", monospace;
+    .nx-dc { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; font: 400 8px/1 "Press Start 2P", monospace;
       letter-spacing: .5px; text-transform: uppercase; text-decoration: none; border: 0; border-radius: 3px; cursor: pointer; white-space: nowrap; }
     .nx-dc svg { width: 14px; height: 12px; flex: none; }
-    .nx-dc.on { color: #fff; background: #5865F2; box-shadow: inset -2px -2px 0 rgba(0,0,0,.3), inset 2px 2px 0 rgba(255,255,255,.25); }
+    .nx-dc.on { color: #fff; background: #5865F2; box-shadow: inset -2px -2px 0 rgba(0,0,0,.3), inset 2px 2px 0 rgba(255,255,255,.25), 0 0 12px rgba(88,101,242,.55); }
     .nx-dc.on:hover { background: #6d78ff; }
-    .nx-dc.add { color: var(--nx-mute, #9aa3b5); background: transparent; border: 1px dashed var(--nx-line2, #3a4252); opacity: .75; }
-    .nx-dc.add:hover, .nx-dc.add:focus-visible { opacity: 1; color: var(--nx-text, #fff); border-color: #5865F2; border-style: solid; }
-    .nx-hero .nx-dc.add { color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.45); opacity: 1; }
-    .nx-hero .nx-dc.add:hover { color: #fff; border-color: #fff; background: rgba(0,0,0,.15); }
+    .nx-dc.add { color: var(--nx-text, #fff); background: rgba(88,101,242,.16); border: 2px solid #5865F2; box-shadow: 2px 2px 0 rgba(0,0,0,.35); }
+    .nx-dc.add svg { color: #5865F2; }
+    .nx-dc.add:hover, .nx-dc.add:focus-visible { color: #fff; background: #5865F2; }
+    .nx-dc.add:hover svg, .nx-dc.add:focus-visible svg { color: #fff; }
+    .nx-hero .nx-dc.add { color: #fff; background: #5865F2; border-color: rgba(255,255,255,.8); }
+    .nx-hero .nx-dc.add svg { color: #fff; }
+    .nx-hero .nx-dc.add:hover { background: #6d78ff; border-color: #fff; }
     .nx-dc-edit { width: 24px; height: 24px; padding: 0; font-size: 12px; color: var(--nx-mute, #9aa3b5); background: none; border: 0; border-radius: 3px; cursor: pointer; opacity: 0; }
     .nx-dc-slot:hover .nx-dc-edit, .nx-dc-edit:focus-visible { opacity: 1; }
     .nx-hero .nx-dc-edit { color: rgba(255,255,255,.8); }
@@ -1854,6 +1864,19 @@
     @media (hover: none) { .nx-dc-edit { opacity: 1; } }
 
     .nx-sw-gear { font-size: 15px !important; line-height: 1; }
+
+    .nx-dci-cursor { position: fixed; left: 0; top: 0; width: 24px; height: 38px; pointer-events: none; transform-origin: 0 0; z-index: 2;
+      filter: drop-shadow(2px 2px 0 rgba(0,0,0,.6)); }
+    .nx-dci-cursor svg { width: 100%; height: 100%; display: block; }
+    .nx-dci-fake { position: fixed; display: flex; align-items: center; pointer-events: none; }
+    .nx-dci-fake .nx-dc { height: 100%; }
+    .nx-dci-card { width: 380px; }
+    .nx-dci-card h2 { display: flex; align-items: center; gap: 8px; }
+    .nx-dci-card h2 svg { width: 16px; height: 14px; color: #8b96ff; }
+    .nx-dci-card .nx-dc { height: 22px; padding: 0 7px; vertical-align: middle; cursor: default; }
+    .nx-dci-card .nx-dc.add { color: #fff; }
+    .nx-dci-card .tip b.gear { width: auto; height: auto; padding: 1px 4px; font: 13px/1 system-ui, sans-serif; border-radius: 3px; }
+    .nx-mli-card.up::before { top: auto; bottom: -12px; border: 3px solid var(--nx-gold); border-left: 0; border-top: 0; }
 
     .nx-set { position: fixed; inset: 0; z-index: 2147483200; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 16px; background: rgba(2,4,24,.8); }
     .nx-set::after { content: ''; position: fixed; inset: 0; pointer-events: none;
@@ -1999,6 +2022,125 @@
     input.select();
   }
 
+  // ---------- Discord DM intro: a pixel cursor clicks "+ DM" and it turns into "Chat" ----------
+  const CURSOR_SVG = '<svg viewBox="0 0 12 19" shape-rendering="crispEdges" aria-hidden="true">'
+    + '<path fill="#fff" stroke="#000" stroke-width="1" d="M.5.5v15l4-4 3 6.5 2.5-1.2-3-6.3h5.5z"/></svg>';
+  // Due on a coach page once My Leagues' intro is out of the way: first visit (no links yet), or "Show again" in Settings.
+  function dcIntroDue() {
+    const f = store.get('dcIntro', null);
+    return f === false || (f == null && !mlIntroDue() && !Object.keys(coachLinks.all()).length);
+  }
+  async function dcIntro(app) {
+    const visible = (el) => el.getClientRects().length > 0;
+    const target = $$('.nx-grp .nx-dc.add', app).find(visible) || $$('.nx-dc.add', app).find(visible) || $$('.nx-dc', app).find(visible);
+    if (!target || $('.nx-mli:not(.fx)')) return;
+    store.set('dcIntro', true);
+    const coach = target.closest('.nx-dc-slot').dataset.coach;
+    target.scrollIntoView({ block: 'center' });
+    await wait(60);
+    const ov = document.createElement('div');
+    ov.className = 'nx-mli';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'nx-dci-title');
+    ov.innerHTML = `<svg class="nx-mli-dim" aria-hidden="true"><defs><mask id="nx-dci-mask"><rect width="100%" height="100%" fill="#fff"/><rect rx="8" fill="#000"/></mask></defs>
+      <rect width="100%" height="100%" fill="rgba(5,8,14,.8)" mask="url(#nx-dci-mask)"/></svg><div class="nx-mli-spot"></div>`;
+    const spot = $('.nx-mli-spot', ov), hole = $('mask rect[rx]', ov);
+    // Spotlight the chip; the card sits below it, or above when there's no room.
+    const place = () => {
+      const r = target.getBoundingClientRect(), box = { x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 };
+      Object.assign(spot.style, { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', height: box.h + 'px' });
+      hole.setAttribute('x', box.x); hole.setAttribute('y', box.y); hole.setAttribute('width', box.w); hole.setAttribute('height', box.h);
+      const card = $('.nx-mli-card', ov);
+      if (!card) return;
+      const cx = r.left + r.width / 2, w = card.offsetWidth, h = card.offsetHeight;
+      const left = Math.min(innerWidth - 12 - w, Math.max(12, cx - 60));
+      const up = r.bottom + 22 + h > innerHeight - 12 && r.top - 22 - h > 12;
+      card.classList.toggle('up', up);
+      card.style.left = left + 'px';
+      card.style.top = (up ? r.top - 22 - h : r.bottom + 22) + 'px';
+      card.style.setProperty('--arrow', Math.max(10, Math.min(w - 30, left + w - cx - 12)) + 'px');
+    };
+    place();
+    app.appendChild(ov);
+    const htmlEl = document.documentElement, prevOverflow = htmlEl.style.overflow;
+    htmlEl.style.overflow = 'hidden';
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      ov.remove();
+      htmlEl.style.overflow = prevOverflow;
+      window.removeEventListener('resize', place);
+      document.removeEventListener('keydown', onKey, true);
+      if (target.isConnected) target.focus();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close(); }
+      if (e.key === 'Tab') {
+        const f = $$('.nx-mli-card button', ov);
+        e.preventDefault();
+        if (f.length) f[(f.indexOf(document.activeElement) + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+      }
+    };
+    window.addEventListener('resize', place);
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', (e) => { if (!e.target.closest('.nx-mli-card')) close(); });
+
+    if (!reducedMotion()) {
+      ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300 });
+      await wait(400);
+      if (done) return;
+      // The cursor glides in and clicks the chip...
+      const cur = document.createElement('div');
+      cur.className = 'nx-dci-cursor';
+      cur.innerHTML = CURSOR_SVG;
+      ov.appendChild(cur);
+      const c = centerOf(target), from = { x: Math.min(innerWidth - 30, c.x + 260), y: Math.min(innerHeight + 30, c.y + 220) };
+      cur.animate([{ transform: `translate(${from.x}px, ${from.y}px)` }, { transform: `translate(${c.x}px, ${c.y}px)` }],
+        { duration: 850, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' });
+      await wait(850);
+      if (done) return;
+      cur.animate([{ transform: `translate(${c.x}px, ${c.y}px) scale(1)` }, { transform: `translate(${c.x}px, ${c.y}px) scale(.8)` },
+        { transform: `translate(${c.x}px, ${c.y}px) scale(1)` }], { duration: 220, fill: 'forwards' });
+      await wait(220);
+      if (done) return;
+      // ...and it becomes a "Chat" button.
+      const r = target.getBoundingClientRect(), fake = document.createElement('div');
+      fake.className = 'nx-dci-fake';
+      fake.innerHTML = `<span class="nx-dc on">${DC_ICON}<span>Chat</span></span>`;
+      Object.assign(fake.style, { left: r.left + 'px', top: r.top + 'px', height: r.height + 'px' });
+      ov.insertBefore(fake, cur);
+      fake.animate([{ transform: 'scale(0)' }, { transform: 'scale(1.25)', offset: 0.6 }, { transform: 'scale(1)' }], { duration: 300, easing: 'steps(4)' });
+      mlSmash(ov, target, 'DM READY!');
+      await wait(1300);
+      if (done) return;
+      [fake, cur].forEach((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' }));
+      await wait(250);
+      fake.remove(); cur.remove();
+      if (done) return;
+    }
+    spot.classList.add('on');
+    const card = document.createElement('div');
+    card.className = 'nx-mli-card nx-dci-card';
+    card.innerHTML = `<h2 id="nx-dci-title">${DC_ICON} NEW! DM ANY COACH</h2>
+      <p>Link a coach once. After that, one click opens your Discord DM with them.</p>
+      <ol><li><span>Press <span class="nx-dc add">${DC_ICON}<span>+ DM</span></span> next to a coach.</span></li>
+        <li><span>In Discord, open your DM with them, right-click any message and pick <b>Copy Message Link</b>.</span></li>
+        <li><span>Paste it. The button turns into <span class="nx-dc on">${DC_ICON}<span>Chat</span></span></span></li></ol>
+      <div class="tip">Change or remove links any time in <b class="gear">⚙</b> Settings, bottom right.</div>
+      <div class="nx-mli-row"><button type="button" data-act="ok">Got it</button><button type="button" class="go" data-act="link">Link ${esc(coach)}</button></div>`;
+    ov.appendChild(card);
+    place();
+    card.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]');
+      if (!b) return;
+      close();
+      if (b.dataset.act === 'link') openDcDialog(coach, target);
+    });
+    $('.go', card).focus();
+  }
+
   // Everything the script saves, by area. Each row clears just its own part.
   const OLD_KEYS = { 'nx:classic': 'Old Classic view switch', 'nx:myteam': 'Old "my team" pin' };
   function openSettings(opener) {
@@ -2030,7 +2172,7 @@
 
     function paint() {
       const leagues = myLeagues.all(), links = Object.values(coachLinks.all()).sort((a, b) => a.coach.localeCompare(b.coach)), prefs = ls();
-      const known = new Set(['nx:theme', 'nx:view', 'nx:mlIntro']);
+      const known = new Set(['nx:theme', 'nx:view', 'nx:mlIntro', 'nx:dcIntro']);
       // Schedule filters, grouped per coach page.
       const filt = {};
       Object.keys(prefs).forEach((k) => {
@@ -2041,7 +2183,7 @@
       });
       const other = Object.keys(prefs).filter((k) => !known.has(k));
       const mode = getMode(), view = store.get('view', DEFAULT_VIEW), viewObj = VERSIONS.find((v) => v.id === view);
-      const introFlag = store.get('mlIntro', null);
+      const introFlag = store.get('mlIntro', null), dcFlag = store.get('dcIntro', null);
       const coaches = [...new Set(Object.values(teamInfo).map((t) => t.coach).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
       body.innerHTML = `<p class="nx-set-intro">Saved only in this browser. Clear one part and keep the rest.</p>`
@@ -2071,7 +2213,10 @@
 
         + sec('04', 'Tips &amp; intros', row('My Leagues intro', introFlag ? 'Seen' : 'Shows next visit',
           'The puck that shows you how to add a team to My Leagues.', 'nx:mlIntro',
-          btn('intro', introFlag ? 'Show again' : 'Show now', 'gold')))
+          btn('intro', introFlag ? 'Show again' : 'Show now', 'gold', ' data-intro="ml"'))
+          + row('Discord DM intro', dcFlag ? 'Seen' : 'Shows next visit',
+            'The cursor that shows you how to link a coach to your Discord DM.', 'nx:dcIntro',
+            btn('intro', dcFlag ? 'Show again' : 'Show now', 'gold', ' data-intro="dc"')))
 
         + sec('05', 'Schedule filters', Object.keys(filt).length
           ? Object.entries(filt).map(([id, f]) => {
@@ -2113,10 +2258,11 @@
       else if (act === 'mode') { setMode(b.dataset.mode); paint(); }
       else if (act === 'reset-view') { lsDel('nx:view'); setView(DEFAULT_VIEW); say('View reset.'); }
       else if (act === 'intro') {
-        store.set('mlIntro', false); // false = replay on the next V1 page, even with leagues saved
-        const app = $('.nx-root.nx-active');
-        if (app && $('.nx-ml-btn', app) && $('.nx-ml-btn', app).getBoundingClientRect().width) { w.close(); mlIntro(app); }
-        else say('The intro shows next time you open a V1 page.');
+        const ml = b.dataset.intro === 'ml', app = $('.nx-root.nx-active');
+        store.set(ml ? 'mlIntro' : 'dcIntro', false); // false = replay on the next V1 page, even if already set up
+        const ready = app && (ml ? $$('.nx-ml-btn', app) : $$('.nx-dc', app)).some((el) => el.getClientRects().length);
+        if (ready) { w.close(); if (ml) mlIntro(app); else dcIntro(app); }
+        else say(ml ? 'The intro shows next time you open a V1 page.' : 'The intro shows next time you open a coach page in V1.');
       }
       else if (act === 'clear-filt' && armed(b)) { ['opp', 'mode', 'collapsed'].forEach((p) => lsDel(`nx:${p}:${b.dataset.id}`)); say('Filters cleared. Reload to see it.'); }
       else if (act === 'clear-filt-all' && armed(b)) { Object.keys(ls()).filter((k) => /^nx:(opp|mode|collapsed):/.test(k)).forEach(lsDel); say('All filters cleared. Reload to see it.'); }

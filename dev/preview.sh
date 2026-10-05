@@ -6,7 +6,7 @@
 #   view     classic | v1 | ...  (defaults to newest)
 #   SCRIPT=path  inject a different build (e.g. dev/out/nhl94-its-in-the-script.latest.user.js)
 #   EXTRA_JS='...' runs before the script (e.g. preset filters: localStorage.setItem("nx:mode:", '"done"'))
-#   INTRO=1  show the first-visit My Leagues intro (skipped by default so screenshots stay clean)
+#   INTRO=1  show the first-visit My Leagues intro; INTRO=dc the Discord DM intro (both skipped by default so screenshots stay clean)
 #   MYLEAGUES='[{"path":"/html/coachpage.php?lg=287&sublg=SNES-CD&team_ID=6714","team":"Calgary","coach":"Stewy","league":"Classic \'94-2026 Fall"}]'
 #            seeds My Leagues (stored via the localStorage fallback, since there's no Tampermonkey here)
 # Output: dev/out/preview-<team_ID>-<view>.png
@@ -37,7 +37,7 @@ js_path, src, out, view, tpath, base, myleagues, url = sys.argv[1:9]
 js = open(js_path, encoding='utf-8').read()
 s = open(src, encoding='latin-1').read()
 s = s.replace('charset=iso-8859-1', 'charset=utf-8').replace('<head>', f'<head><base href="{base}">', 1)
-pre = f'window.__nxTestPath={json.dumps(tpath)};window.__nxTestHref={json.dumps(url)};localStorage.clear();' + ('' if os.environ.get('INTRO') else 'localStorage.setItem("nx:mlIntro","true");') + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
+pre = f'window.__nxTestPath={json.dumps(tpath)};window.__nxTestHref={json.dumps(url)};localStorage.clear();' + ('' if os.environ.get('INTRO') == '1' else 'localStorage.setItem("nx:mlIntro","true");') + ('' if os.environ.get('INTRO') == 'dc' else 'localStorage.setItem("nx:dcIntro","true");') + (f'localStorage.setItem("nx:view",{json.dumps(json.dumps(view))});' if view else '')
 if myleagues:
     pre += f'localStorage.setItem("nx:gm:myLeagues",{json.dumps(myleagues)});'
 import os
