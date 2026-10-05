@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Latest)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.4.1.33
+// @version      1.4.1.34
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '1.4.1.33';
+  const SCRIPT_VERSION = '1.4.1.34';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'latest';
   const FUN = CHANNEL === 'fun';
@@ -313,7 +313,7 @@
       '--nx-hero1': hero, '--nx-red': btn, '--nx-on-red': onColor(btn),
       '--nx-gold': gold, '--nx-on-gold': onColor(gold),
       '--nx-acc-n': acc.n || readableOn('#141C2F', gold, 4.5),
-      '--nx-acc-d': acc.d || readableOn('#FFFFFF', gold, 4.5),
+      '--nx-acc-d': acc.d || readableOn('#E3EBF5', gold, 5.5), // checked on the darkest Day surface (team header rows), with room to spare for small text
     };
   }
   // Home: the original site's royal blue, dark red and yellow (links stay the site's blue in Day mode).
