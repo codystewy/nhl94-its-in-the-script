@@ -27,7 +27,14 @@
   const SCRIPT_VERSION = '1.4.1';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'stable';
-  const FUN = CHANNEL === 'fun'; // gate fun-only extras with `if (FUN)`
+  const FUN = CHANNEL === 'fun';
+  // Fun-only extras: they run on the Fun channel only and never reach Latest or Stable.
+  // Gate each one with `if (funOn('id'))`. To retire one, delete its entry and every funOn('id') block.
+  // `/git summary` lists these with their age.
+  const FUN_EXTRAS = {
+    // id: { name: 'Custom scrollbars', added: 'YYYY-MM-DD' },
+  };
+  const funOn = (id) => FUN && Object.prototype.hasOwnProperty.call(FUN_EXTRAS, id);
 
   // ============================================================
   // Helpers
