@@ -646,11 +646,37 @@
       background: var(--nx-card); border: 1px solid var(--nx-line); border-left: 4px solid var(--nx-red); border-radius: 8px; box-shadow: var(--nx-shadow); }
     .nx-lgbar-f { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .nx-lgbar-f .nx-lab { margin: 0; font-size: 8px; color: var(--nx-mute); }
-    .nx-lgbar-f.lg { flex: 0 1 380px; }
-    .nx-lgbar-f.lg select { flex: 1; min-width: 0; font-weight: 600; }
-    .nx-lgbar-f select { min-height: 34px; font-size: 14px; }
+    .nx-lgbar { position: relative; z-index: 20; }
+    .nx-lgbar-f.lg { flex: 0 1 400px; }
+    .nx-pk { position: relative; flex: 1; min-width: 0; }
+    .nx-pk-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 12px; font: 600 14px var(--nx-ui); color: var(--nx-text);
+      text-align: left; background: var(--nx-card2); border: 1px solid var(--nx-line2); border-radius: 6px; cursor: pointer; }
+    .nx-lgbar-f.lv .nx-pk-btn { min-width: 120px; }
+    .nx-pk-btn .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nx-pk-btn .car { flex: none; width: 0; height: 0; border: 5px solid transparent; border-top: 6px solid var(--nx-acc); border-bottom: 0; margin-top: 3px; transition: transform .15s; }
+    .nx-pk-btn:hover, .nx-pk.open .nx-pk-btn { border-color: var(--nx-acc); }
+    .nx-pk.open .nx-pk-btn .car { transform: rotate(180deg); }
+    .nx-pk-pop { position: absolute; left: 0; top: calc(100% + 6px); width: max(100%, 300px); max-width: calc(100vw - 32px); padding: 6px;
+      background: var(--nx-card); border: 1px solid var(--nx-line2); border-top: 3px solid var(--nx-red); border-radius: 0 0 10px 10px; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+    .nx-pk-pop[hidden] { display: none; }
+    .nx-pk-qw { position: relative; margin-bottom: 6px; }
+    .nx-pk-qw::before { content: ''; position: absolute; left: 11px; top: 50%; width: 9px; height: 9px; margin-top: -7px; border: 2px solid var(--nx-mute); border-radius: 50%; }
+    .nx-pk-qw::after { content: ''; position: absolute; left: 20px; top: 50%; width: 2px; height: 6px; margin-top: 1px; background: var(--nx-mute); transform: rotate(-45deg); }
+    .nx-pk-q { width: 100%; min-height: 36px; padding: 6px 10px 6px 32px; font: 500 14px var(--nx-ui); color: var(--nx-text); background: var(--nx-bg2);
+      border: 1px solid var(--nx-line2); border-radius: 6px; }
+    .nx-pk-q:focus { outline: none; border-color: var(--nx-gold); box-shadow: 0 0 0 1px var(--nx-gold); }
+    .nx-pk-q::-webkit-search-cancel-button { cursor: pointer; }
+    .nx-pk-list { list-style: none; margin: 0; padding: 0; max-height: min(360px, 55vh); overflow-y: auto; outline: none; }
+    .nx-pk-list li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font: 500 14px var(--nx-ui); color: var(--nx-text); cursor: pointer; }
+    .nx-pk-list li[hidden] { display: none; }
+    .nx-pk-list li .n { flex: 1; min-width: 0; }
+    .nx-pk-list li.act { background: var(--nx-card2); box-shadow: inset 3px 0 0 var(--nx-gold); }
+    .nx-pk-list li[aria-selected="true"] { font-weight: 700; color: var(--nx-acc); }
+    .nx-pk-list li[aria-selected="true"]::after { content: '✓'; font-weight: 700; color: var(--nx-acc); }
+    .nx-pk-list li .star { color: var(--nx-acc); font-size: 13px; }
+    .nx-pk-empty { padding: 10px; font-size: 13px; color: var(--nx-mute); }
     @media (max-width: 760px) { .nx-lgbar { margin-top: 0; } }
-    @media (max-width: 560px) { .nx-lgbar-f.lg { flex-basis: 100%; } }
+    @media (max-width: 560px) { .nx-lgbar-f.lg { flex-basis: 100%; } .nx-pk-pop { width: 100%; } }
     .nx-dir-h { padding: 10px 16px 4px; font-family: var(--nx-px); font-size: 8px; color: var(--nx-acc); letter-spacing: .5px; }
     .nx-dir a { display: flex; align-items: center; gap: 10px; padding: 5px 16px; font-size: 13px; }
     .nx-dir a:hover { background: var(--nx-hover); }
@@ -707,10 +733,25 @@
   // "League Selection" box. Seasons are listed newest first.
   function v1LeagueBar() {
     if (!leagueOpts.length && !levelOpts.length) return '';
-    const opts = (list) => list.map((o) => `<option value="${esc(o.v)}"${o.sel ? ' selected' : ''}>${esc(o.t)}</option>`).join('');
+    const curLg = leagueOpts.find((o) => o.sel) || {}, curLv = levelOpts.find((o) => o.sel) || {};
+    // Dropdown in the page's style. `search` adds a filter box (the league list is long).
+    const picker = (kind, label, opts, cur, search) => `<div class="nx-lgbar-f ${kind}"><span class="nx-lab" id="nx-pk-${kind}-l">${label}</span>
+      <div class="nx-pk" data-kind="${kind}">
+        <button type="button" class="nx-pk-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="nx-pk-${kind}-l nx-pk-${kind}-t">
+          <span class="t" id="nx-pk-${kind}-t">${esc(cur.t || 'Choose…')}</span><span class="car" aria-hidden="true"></span></button>
+        <div class="nx-pk-pop" hidden>
+          ${search ? `<div class="nx-pk-qw"><input class="nx-pk-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search ${opts.length} leagues…"
+            role="combobox" aria-expanded="true" aria-controls="nx-pk-${kind}-list" aria-label="Search leagues"></div>` : ''}
+          <ul class="nx-pk-list" id="nx-pk-${kind}-list" role="listbox" aria-labelledby="nx-pk-${kind}-l">
+            ${opts.map((o, i) => `<li role="option" id="nx-pk-${kind}-${i}" data-v="${esc(o.v)}" aria-selected="${o.sel}"${o.mine ? ' class="mine"' : ''}>
+              <span class="n">${esc(o.t)}</span>${o.mine ? '<span class="star" title="You have a team here (My Leagues)">★</span>' : ''}</li>`).join('')}
+          </ul>
+          ${search ? '<div class="nx-pk-empty" hidden></div>' : ''}
+        </div></div></div>`;
+    const mine = new Set(myLeagues.all().map((x) => x.lg));
     return `<div class="nx-lgbar" role="group" aria-label="League selection">
-      ${leagueOpts.length ? `<label class="nx-lgbar-f lg"><span class="nx-lab">LEAGUE</span><select class="nx-lg-sel">${opts([...leagueOpts].reverse())}</select></label>` : ''}
-      ${levelOpts.length ? `<label class="nx-lgbar-f lv"><span class="nx-lab">LEVEL</span><select class="nx-level-sel">${opts(levelOpts)}</select></label>` : ''}
+      ${leagueOpts.length ? picker('lg', 'LEAGUE', [...leagueOpts].reverse().map((o) => ({ ...o, mine: mine.has(o.v) })), curLg, true) : ''}
+      ${levelOpts.length ? picker('lv', 'LEVEL', levelOpts, curLv, false) : ''}
     </div>`;
   }
 
@@ -728,10 +769,56 @@
 
   // Wire the season / level pickers (same URLs the original selects used).
   function v1WirePickers(app) {
-    $$('.nx-lg-sel', app).forEach((el) => el.addEventListener('change', () => { location.href = '?lg=' + encodeURIComponent(el.value); }));
-    $$('.nx-level-sel', app).forEach((el) => el.addEventListener('change', () => {
-      location.href = '?lg=' + encodeURIComponent(params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '') + '&sublg=' + encodeURIComponent(el.value);
-    }));
+    const go = { lg: (v) => '?lg=' + encodeURIComponent(v),
+      lv: (v) => '?lg=' + encodeURIComponent(params.get('lg') || (leagueOpts.find((o) => o.sel) || {}).v || '') + '&sublg=' + encodeURIComponent(v) };
+    const fold = (t) => t.toLowerCase().replace(/[’'`]/g, '').replace(/\s+/g, ' ');
+    $$('.nx-pk', app).forEach((pk) => {
+      const btn = $('.nx-pk-btn', pk), pop = $('.nx-pk-pop', pk), q = $('.nx-pk-q', pk), empty = $('.nx-pk-empty', pk);
+      const items = $$('li', pk), shown = () => items.filter((li) => !li.hidden);
+      let active = null;
+      const setActive = (li) => {
+        if (active) active.classList.remove('act');
+        active = li;
+        if (li) { li.classList.add('act'); li.scrollIntoView({ block: 'nearest' }); }
+        (q || btn).setAttribute('aria-activedescendant', li ? li.id : '');
+      };
+      const filter = () => {
+        const words = fold(q.value).split(' ').filter(Boolean);
+        items.forEach((li) => { const t = fold(li.textContent); li.hidden = !words.every((w) => t.includes(w)); });
+        const n = shown().length;
+        empty.hidden = !!n;
+        if (!n) empty.textContent = `No league matches “${q.value.trim()}”.`;
+        setActive(shown()[0] || null);
+      };
+      const open = (on) => {
+        pop.hidden = !on;
+        btn.setAttribute('aria-expanded', String(on));
+        pk.classList.toggle('open', on);
+        if (!on) return;
+        if (q) { q.value = ''; filter(); }
+        const cur = $('li[aria-selected="true"]', pk);
+        setActive(cur || items[0]);
+        (q || $('.nx-pk-list', pk)).focus();
+      };
+      const pick = (li) => { if (!li) return; open(false); $('.t', btn).textContent = $('.n', li).textContent; location.href = go[pk.dataset.kind](li.dataset.v); };
+      $('.nx-pk-list', pk).tabIndex = -1;
+      btn.addEventListener('click', () => open(pop.hidden));
+      btn.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(true); } });
+      if (q) q.addEventListener('input', filter);
+      pk.addEventListener('keydown', (e) => {
+        if (pop.hidden) return;
+        const list = shown(), i = list.indexOf(active);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setActive(list[Math.max(0, Math.min(list.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]); }
+        else if (e.key === 'Home' && !q) { e.preventDefault(); setActive(list[0]); }
+        else if (e.key === 'End' && !q) { e.preventDefault(); setActive(list[list.length - 1]); }
+        else if (e.key === 'Enter') { e.preventDefault(); pick(active); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); open(false); btn.focus(); }
+        else if (e.key === 'Tab') open(false);
+      });
+      pk.addEventListener('mousemove', (e) => { const li = e.target.closest('li'); if (li && li !== active) setActive(li); });
+      pk.addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) pick(li); });
+      document.addEventListener('click', (e) => { if (!pop.hidden && !pk.contains(e.target)) open(false); });
+    });
   }
 
   // ============================================================
