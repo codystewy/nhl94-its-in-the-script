@@ -82,19 +82,8 @@ You are a **senior EA Sports UI designer and front-end developer** with years of
 4. **Don't raise `@version` for everyday commits.** Versions are raised only at release time (below).
 5. Tell the user what changed, what you verified (and what you didn't).
 
-## Releases (the user says "wrap these up into a release", then "push changes")
+## Releases and pushing: use the `/gp` skill
 
-- **Versioning:** [SemVer](https://semver.org) `1.MINOR.PATCH`.
-  - Any `feat` raises MINOR (1.4.1 → 1.5.0).
-  - Only `fix`/`style`/`perf` raise PATCH (1.4.1 → 1.4.2).
-  - Only `docs`/`chore`/`refactor`/dev-tooling changes **don't warrant a release**. Tell the user that, and offer to push without a version change.
-  - Breaking changes (removed features, wiped saved data) would be 2.0.0. Ask first.
-- **Steps:**
-  1. List the changes since the last tag: `git log --oneline $(git describe --tags --abbrev=0)..HEAD`. Propose the new version number.
-  2. Bump `@version` in the script header. Tampermonkey only auto-updates users when this number goes up, so pushed code changes without a bump never reach anyone.
-  3. Add a CHANGELOG.md entry: `## [x.y.z] – YYYY-MM-DD` grouped under ✨ New / 🎨 Looks / 🐛 Fixed / 📖 Docs. Add a compare link at the bottom.
-  4. Replace the README **"What's new"** section with the new release.
-  5. Commit as `chore(release): vX.Y.Z`, then tag with `git tag -a vX.Y.Z -m "vX.Y.Z"`.
-  6. On "push": `git push origin main --follow-tags`. Optionally run `gh release create vX.Y.Z --notes-file <that changelog section>`.
+- `/gp push` commits anything left, summarizes all unpushed changes, proposes a SemVer bump, previews the CHANGELOG and README "What's new", and pushes after the user confirms. `/gp status` only previews. The full rules (feat → minor, fix/style → patch, docs/chore → no release, breaking → ask about major) live in `.claude/skills/gp/SKILL.md`.
 - **Writing style for CHANGELOG and What's new:** plain English and a bit funny, with hockey puns welcome. **No technical jargon** (no "refactor", "tokens", "localStorage", "DOM"). Say what a player notices.
 - The one-line origin note at the top of the README ("It started with just wanting a dark and night mode…") was requested by the user. Keep it, and don't add any other purpose or motivation statements.
