@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Latest)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      1.4.1.24
+// @version      1.4.1.26
 // @description  Redesigns nhl94online.com (home + coach pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '1.4.1.24';
+  const SCRIPT_VERSION = '1.4.1.26';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'latest';
   const FUN = CHANNEL === 'fun';
@@ -655,7 +655,7 @@
         <div class="nx-ticker-track">${tickerItems.repeat(4)}</div></div>` : ''}
       <header class="nx-top">
         <a class="nx-brand" href="/"><span class="nx-brand-a">NHL'94</span><span class="nx-brand-b">ONLINE</span></a>
-        <div class="nx-ml"><button type="button" class="nx-topbtn nx-ml-btn" aria-expanded="false" aria-haspopup="true" title="Your teams in each league"><span class="nx-star">★</span><span class="lbl">My Leagues</span><span class="nx-ml-count"></span></button><div class="nx-ml-menu" hidden></div></div>
+        <div class="nx-ml"><button type="button" class="nx-topbtn nx-ml-btn" aria-expanded="false" aria-haspopup="true" title="Your teams in each league"><span class="nx-star">★</span><span class="lbl">My Leagues</span><span class="nx-ml-count"></span></button><button type="button" class="nx-ml-help" title="What is My Leagues?" aria-label="What is My Leagues?" hidden>?</button><div class="nx-ml-menu" hidden></div></div>
         <button type="button" class="nx-topbtn nx-menu-btn" aria-expanded="false" aria-controls="nx-nav">☰ Menu</button>
         <nav class="nx-nav" id="nx-nav">${navHtml}</nav>
       </header>`,
@@ -812,8 +812,65 @@
       background: none; border: 0; border-top: 1px solid var(--nx-line); cursor: pointer; }
     .nx-ml-manage:hover { background: var(--nx-card2); }
     @media (max-width: 760px) { .nx-ml-btn .lbl { display: none; } }
+    .nx-top .nx-ml-btn { border-color: var(--nx-gold); background: rgba(255,255,255,.08); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 14px -2px var(--nx-gold); }
+    .nx-top .nx-ml-btn .nx-star { font-size: 15px; text-shadow: 0 0 8px var(--nx-gold); }
+    .nx-ml-help { position: absolute; top: -7px; right: -9px; z-index: 2; width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
+      font: 400 9px/1 var(--nx-px); color: var(--nx-on-gold); background: var(--nx-gold); border: 2px solid #0a0d18; border-radius: 50%; cursor: pointer; }
+    .nx-ml-help[hidden] { display: none; }
+    .nx-ml-help:hover { filter: brightness(1.12); transform: scale(1.1); }
+    .nx-ml-help:focus-visible, .nx-ml-btn:focus-visible { outline: 2px solid var(--nx-gold); outline-offset: 2px; }
+    .nx-ml-help.pop { animation: nx-pop .5s cubic-bezier(.3,1.8,.5,1) both; }
+    .nx-ml-btn.hit { animation: nx-hit .45s steps(6) both; }
+    @keyframes nx-pop { from { transform: scale(0) rotate(-200deg); } to { transform: none; } }
+    @keyframes nx-hit { 0% { transform: translate(0,0); background: #fff; color: #111; } 20% { transform: translate(-5px,3px) rotate(-3deg); }
+      40% { transform: translate(5px,-3px) rotate(3deg); background: var(--nx-gold); } 60% { transform: translate(-3px,1px); } 80% { transform: translate(2px,-1px); } 100% { transform: none; } }
 
-    .nx-btn.nx-ml-add[aria-pressed="true"] { border-color: var(--nx-gold); color: var(--nx-gold) !important; }
+    /* "★ Add to My Leagues" on the coach hero: ice-white so it stands apart from the team-coloured buttons. */
+    .nx-btn.nx-ml-add { background: #F4F7FB; border-color: #fff; color: #0A0D18 !important; box-shadow: 0 0 0 0 rgba(255,255,255,.6); }
+    .nx-btn.nx-ml-add:hover { background: #fff; border-color: var(--nx-gold); }
+    .nx-btn.nx-ml-add .nx-star { font-size: 14px; color: #D4A017; margin-right: 6px; }
+    .nx-btn.nx-ml-add[aria-pressed="false"] { animation: nx-ping 1.6s ease-out .8s 3; }
+    .nx-btn.nx-ml-add[aria-pressed="true"] { background: rgba(0,0,0,.35); border-color: var(--nx-gold); color: var(--nx-gold) !important; }
+    .nx-btn.nx-ml-add[aria-pressed="true"] .nx-star { color: var(--nx-gold); }
+    @keyframes nx-ping { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,.7); } 100% { box-shadow: 0 0 0 14px rgba(255,255,255,0); } }
+
+    /* My Leagues intro: dimmed overlay, spotlight on the button, puck, shards, callout. */
+    .nx-mli { position: fixed; inset: 0; z-index: 2147482000; overflow: hidden; }
+    .nx-mli.fx::after { display: none; }
+    .nx-mli::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px); }
+    .nx-mli-dim { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .nx-mli-spot { position: fixed; border-radius: 10px; pointer-events: none; }
+    .nx-mli-spot.on { outline: 3px dashed var(--nx-gold); outline-offset: 4px; animation: nx-spot 1s steps(2) infinite; }
+    @keyframes nx-spot { 50% { outline-color: #fff; } }
+    .nx-mli-puck { position: fixed; left: 0; top: 0; width: 36px; height: 24px; margin: -12px 0 0 -18px; pointer-events: none; image-rendering: pixelated; }
+    .nx-mli-puck svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px var(--nx-gold)); }
+    .nx-mli-bit { position: fixed; left: 0; top: 0; width: 6px; height: 6px; pointer-events: none; }
+    .nx-mli-flash { position: fixed; inset: 0; background: #fff; pointer-events: none; opacity: 0; }
+    .nx-mli-pow { position: fixed; pointer-events: none; font: 400 14px var(--nx-px); color: var(--nx-gold); white-space: nowrap;
+      text-shadow: 3px 3px 0 var(--nx-red), -1px -1px 0 #000, 1px 1px 0 #000; }
+    .nx-mli-card { position: fixed; width: 340px; max-width: calc(100vw - 24px); padding: 16px 18px 14px; color: #fff;
+      background: #0B1022; border: 3px solid var(--nx-gold); border-radius: 4px; box-shadow: 6px 6px 0 rgba(0,0,0,.6), 0 0 0 3px #0B1022 inset;
+      animation: nx-card-in .35s steps(5) both; }
+    .nx-mli-card::before { content: ""; position: absolute; top: -12px; right: var(--arrow, 40px); width: 18px; height: 18px; background: #0B1022;
+      border: 3px solid var(--nx-gold); border-right: 0; border-bottom: 0; transform: rotate(45deg); }
+    @keyframes nx-card-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+    .nx-mli-card h2 { margin: 0 0 10px; font: 400 11px/1.5 var(--nx-px); color: var(--nx-gold); letter-spacing: .5px; }
+    .nx-mli-card p { margin: 0 0 10px; font: 400 14px/1.45 var(--nx-ui); color: #DDE4F0; }
+    .nx-mli-card ol { margin: 0 0 12px; padding: 0; list-style: none; counter-reset: s; }
+    .nx-mli-card .nx-star { font-size: 1.3em; line-height: 1; }
+    .nx-mli-card li { counter-increment: s; display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font: 400 14px/1.4 var(--nx-ui); color: #fff; }
+    .nx-mli-card li::before { content: counter(s); flex: none; font: 400 9px var(--nx-px); color: #0B1022; background: var(--nx-gold); padding: 4px 5px; border-radius: 2px; }
+    .nx-mli-card .tip { font-size: 12px; color: #9AA6BC; }
+    .nx-mli-card .tip b { display: inline-grid; place-items: center; width: 18px; height: 18px; font: 400 8px var(--nx-px); color: #111; background: var(--nx-gold); border-radius: 50%; vertical-align: middle; }
+    .nx-mli-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+    .nx-mli-row button { font: 400 9px var(--nx-px); letter-spacing: .5px; padding: 10px 12px; border-radius: 2px; cursor: pointer;
+      color: #fff; background: transparent; border: 2px solid rgba(255,255,255,.45); }
+    .nx-mli-row button.go { color: #111; background: var(--nx-gold); border-color: var(--nx-gold); box-shadow: 3px 3px 0 #000; }
+    .nx-mli-row button:hover { filter: brightness(1.12); border-color: #fff; }
+    .nx-mli-row button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      .nx-btn.nx-ml-add[aria-pressed="false"], .nx-mli-spot.on, .nx-mli-card, .nx-ml-help.pop, .nx-ml-btn.hit { animation: none; }
+    }
 
     .nx-modal { position: fixed; inset: 0; z-index: 2147483100; display: grid; place-items: center; padding: 16px; background: rgba(5,8,14,.66); backdrop-filter: blur(3px); }
     .nx-modal[hidden] { display: none; }
@@ -873,7 +930,7 @@
     const cur = PAGE === 'coach' ? (parseCoachUrl(HREF) || {}).id : '';
     return (l.length
       ? l.map((x) => `<a class="nx-ml-item${x.id === cur ? ' cur' : ''}" href="${esc(x.path)}">${logoImg(x.team)}<span><b>${esc(mlTitle(x))}</b><small>${esc(mlSub(x))}</small></span></a>`).join('')
-      : '<div class="nx-ml-empty">No leagues yet. Open one of your coach pages and press <b>+ Add to My Leagues</b>.</div>')
+      : '<div class="nx-ml-empty">No leagues yet. Open one of your coach pages and press <b>★ Add to My Leagues</b>.</div>')
       + '<button type="button" class="nx-ml-manage">⚙ Manage, back up &amp; restore…</button>';
   }
 
@@ -890,6 +947,188 @@
     document.addEventListener('nx:myleagues', paint);
     paint();
     app.addEventListener('click', (e) => { if (e.target.closest('[data-ml-manage]')) { e.preventDefault(); openManager(app); } });
+
+    // "?" badge replays the intro. It shows once the intro has run (or the user already has leagues).
+    const help = $('.nx-ml-help', app);
+    help.hidden = !(store.get('mlIntro', false) || myLeagues.all().length);
+    help.addEventListener('click', (e) => { e.stopPropagation(); setOpen(false); mlIntro(app); });
+    // First visit: the puck intro, once per browser.
+    if (!store.get('mlIntro', false) && !myLeagues.all().length) {
+      setTimeout(() => { if (app.classList.contains('nx-active') && !$('.nx-mli') && !$('.nx-modal:not([hidden])')) { setOpen(false); mlIntro(app); } }, 1200);
+    }
+  }
+
+  // ---------- My Leagues: puck + smash effects ----------
+  const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const PUCK_SVG = '<svg viewBox="0 0 12 8" shape-rendering="crispEdges" aria-hidden="true">'
+    + '<rect x="2" y="0" width="8" height="1" fill="#4b5263"/><rect x="0" y="1" width="12" height="2" fill="#2b303b"/>'
+    + '<rect x="3" y="1" width="4" height="1" fill="#6b7487"/><rect x="0" y="3" width="12" height="3" fill="#0d0f14"/>'
+    + '<rect x="1" y="4" width="10" height="1" fill="#22262f"/><rect x="2" y="6" width="8" height="1" fill="#0d0f14"/></svg>';
+  const centerOf = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+
+  // Slap shot along a curve from `a` to `b`, with a fading pixel trail. Resolves on impact.
+  function mlPuck(layer, a, b, ms = 700) {
+    const c = { x: b.x - (b.x - a.x) * 0.15, y: a.y - (a.y - b.y) * 0.95 };
+    const frames = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16, u = 1 - t;
+      const x = u * u * a.x + 2 * u * t * c.x + t * t * b.x, y = u * u * a.y + 2 * u * t * c.y + t * t * b.y;
+      frames.push({ transform: `translate(${x}px, ${y}px) rotate(${t * 900}deg) scale(${1.7 - t * 0.8})`, offset: t });
+    }
+    const pucks = [0, 1, 2, 3].map((i) => {
+      const p = document.createElement('div');
+      p.className = 'nx-mli-puck';
+      p.innerHTML = PUCK_SVG;
+      p.style.opacity = String(1 - i * 0.28);
+      layer.appendChild(p);
+      p.animate(frames, { duration: ms, delay: i * 28, easing: 'linear', fill: 'both' });
+      return p;
+    });
+    return wait(ms).then(() => { pucks.forEach((p) => p.remove()); });
+  }
+
+  // Impact: the button shakes, the screen flashes, pixel shards fly and a word pops.
+  function mlSmash(layer, btn, word) {
+    const { x, y } = centerOf(btn);
+    btn.classList.remove('hit'); void btn.offsetWidth; btn.classList.add('hit');
+    setTimeout(() => btn.classList.remove('hit'), 500);
+    const flash = document.createElement('div');
+    flash.className = 'nx-mli-flash';
+    layer.appendChild(flash);
+    flash.animate([{ opacity: 0.35 }, { opacity: 0 }], { duration: 180 }).onfinish = () => flash.remove();
+    const cs = getComputedStyle(btn);
+    const colors = ['#fff', cs.getPropertyValue('--nx-gold') || '#F1BE48', cs.getPropertyValue('--nx-red') || '#C8102E', '#9AA6BC'];
+    for (let i = 0; i < 16; i++) {
+      const s = document.createElement('div');
+      s.className = 'nx-mli-bit';
+      s.style.background = colors[i % colors.length];
+      layer.appendChild(s);
+      const ang = (i / 16) * Math.PI * 2 + Math.random() * 0.4, d = 40 + Math.random() * 80;
+      const dx = Math.cos(ang) * d, dy = Math.sin(ang) * d;
+      s.animate([
+        { transform: `translate(${x}px, ${y}px) rotate(0)`, opacity: 1 },
+        { transform: `translate(${x + dx}px, ${y + dy * 0.6}px) rotate(180deg)`, opacity: 1, offset: 0.6 },
+        { transform: `translate(${x + dx * 1.2}px, ${y + dy * 0.6 + 50}px) rotate(270deg)`, opacity: 0 },
+      ], { duration: 700, easing: 'cubic-bezier(.2,.8,.4,1)' }).onfinish = () => s.remove();
+    }
+    const pow = document.createElement('div');
+    pow.className = 'nx-mli-pow';
+    pow.textContent = word;
+    layer.appendChild(pow);
+    const r = btn.getBoundingClientRect();
+    pow.style.left = Math.max(8, r.left - pow.offsetWidth - 18) + 'px';
+    pow.style.top = (r.top + r.height / 2 - 10) + 'px';
+    pow.animate([
+      { transform: 'scale(0) rotate(-12deg)', opacity: 1 }, { transform: 'scale(1.35) rotate(-6deg)', opacity: 1, offset: 0.2 },
+      { transform: 'scale(1) rotate(-6deg)', opacity: 1, offset: 0.75 }, { transform: 'scale(1) rotate(-6deg) translateY(-8px)', opacity: 0 },
+    ], { duration: 1100, easing: 'ease-out', fill: 'both' }).onfinish = () => pow.remove();
+  }
+
+  // Coach page: after "★ Add to My Leagues", a puck flies from that button into the top-bar button.
+  function mlShoot(app, fromEl, word) {
+    const btn = $('.nx-ml-btn', app);
+    if (reducedMotion() || !btn.getBoundingClientRect().width || !fromEl.getBoundingClientRect().width) return;
+    const layer = document.createElement('div');
+    layer.className = 'nx-mli';
+    layer.style.pointerEvents = 'none';
+    layer.classList.add('fx');
+    app.appendChild(layer);
+    mlPuck(layer, centerOf(fromEl), centerOf(btn), 600).then(() => { mlSmash(layer, btn, word); setTimeout(() => layer.remove(), 1200); });
+  }
+
+  // The intro: spotlight the top-bar button, shoot a puck at it, then explain My Leagues.
+  async function mlIntro(app) {
+    const btn = $('.nx-ml-btn', app), help = $('.nx-ml-help', app);
+    if (!btn.getBoundingClientRect().width || $('.nx-mli:not(.fx)', app)) return;
+    store.set('mlIntro', true);
+    const add = $('.nx-ml-add:not([hidden])', app);
+    const canAdd = add && add.getAttribute('aria-pressed') === 'false';
+    const ov = document.createElement('div');
+    ov.className = 'nx-mli';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'nx-mli-title');
+    // Dim everything except the top-bar button (and, on a coach page not yet saved, the Add button).
+    const lit = canAdd ? [btn, add] : [btn];
+    ov.innerHTML = `<svg class="nx-mli-dim" aria-hidden="true"><defs><mask id="nx-mli-mask"><rect width="100%" height="100%" fill="#fff"/>
+      ${lit.map(() => '<rect rx="10" fill="#000"/>').join('')}</mask></defs><rect width="100%" height="100%" fill="rgba(5,8,14,.8)" mask="url(#nx-mli-mask)"/></svg>`
+      + lit.map(() => '<div class="nx-mli-spot"></div>').join('');
+    const spots = $$('.nx-mli-spot', ov), holes = $$('mask rect[rx]', ov);
+    const place = () => {
+      lit.forEach((el, i) => {
+        const r = el.getBoundingClientRect(), box = { x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 };
+        Object.assign(spots[i].style, { left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', height: box.h + 'px' });
+        holes[i].setAttribute('x', box.x); holes[i].setAttribute('y', box.y); holes[i].setAttribute('width', box.w); holes[i].setAttribute('height', box.h);
+      });
+      const r = btn.getBoundingClientRect();
+      const card = $('.nx-mli-card', ov);
+      if (!card) return;
+      const cx = r.left + r.width / 2, w = card.offsetWidth;
+      const left = Math.min(innerWidth - 12 - w, Math.max(12, cx - w + 48));
+      card.style.left = left + 'px';
+      card.style.top = r.bottom + 22 + 'px';
+      card.style.setProperty('--arrow', Math.max(10, Math.min(w - 30, left + w - cx - 12)) + 'px');
+    };
+    place();
+    app.appendChild(ov);
+    const htmlEl = document.documentElement, prevOverflow = htmlEl.style.overflow;
+    htmlEl.style.overflow = 'hidden';
+    let done = false;
+    const close = () => {
+      if (done) return;
+      done = true;
+      ov.remove();
+      htmlEl.style.overflow = prevOverflow;
+      window.removeEventListener('resize', place);
+      document.removeEventListener('keydown', onKey, true);
+      btn.focus();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close(); }
+      if (e.key === 'Tab') {
+        const f = $$('.nx-mli-card button', ov);
+        if (!f.length) { e.preventDefault(); return; }
+        const i = f.indexOf(document.activeElement);
+        e.preventDefault();
+        f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+      }
+    };
+    window.addEventListener('resize', place);
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', (e) => { if (!e.target.closest('.nx-mli-card')) close(); });
+
+    if (!reducedMotion()) {
+      ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300 });
+      await wait(450);
+      if (done) return;
+      await mlPuck(ov, { x: innerWidth * 0.2, y: innerHeight + 30 }, centerOf(btn));
+      if (done) return;
+      mlSmash(ov, btn, 'BAR DOWN!');
+      await wait(380);
+      if (done) return;
+    }
+    help.hidden = false;
+    help.classList.remove('pop'); void help.offsetWidth; help.classList.add('pop');
+    spots.forEach((x) => x.classList.add('on'));
+    const card = document.createElement('div');
+    card.className = 'nx-mli-card';
+    card.innerHTML = `<h2 id="nx-mli-title"><span class="nx-star">★</span> NEW! MY LEAGUES</h2>
+      <p>Keep your coach page from every league and level right up here, one click away.</p>
+      <ol><li><span>Open your coach page.</span></li><li><span>Press <b><span class="nx-star">★</span> Add to My Leagues</b>${canAdd ? ' (lit up on this page)' : ''}.</span></li>
+        <li><span>Jump back any time from this button.</span></li></ol>
+      <div class="tip">Lost? Press <b>?</b> to see this again.</div>
+      <div class="nx-mli-row">${canAdd ? '<button type="button" data-act="ok">Got it</button><button type="button" class="go" data-act="add"><span class="nx-star">★</span> Add this team</button>'
+        : '<button type="button" class="go" data-act="ok">Got it</button>'}</div>`;
+    ov.appendChild(card);
+    place();
+    card.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]');
+      if (!b) return;
+      close();
+      if (b.dataset.act === 'add') add.click();
+    });
+    $('.go', card).focus();
   }
 
   function openManager(app) {
@@ -967,7 +1206,7 @@
             <button type="button" class="nx-ib" data-act="down" ${i === draft.length - 1 ? 'disabled' : ''} aria-label="Move down" title="Move down">↓</button>
             <button type="button" class="nx-ib del" data-act="del" aria-label="Remove" title="Remove">✕</button>
           </div>
-        </div>`).join('') : '<div class="nx-mm-empty">No leagues yet. Add one with <b>+ Add to My Leagues</b> on a coach page, or paste a coach page link below.</div>';
+        </div>`).join('') : '<div class="nx-mm-empty">No leagues yet. Add one with <b>★ Add to My Leagues</b> on a coach page, or paste a coach page link below.</div>';
     };
     const showConfirm = (html) => { confirmBox.innerHTML = html; confirmBox.hidden = !html; };
     const showRestore = (html) => { restoreBox.innerHTML = html; restoreBox.hidden = !html; };
@@ -1191,10 +1430,10 @@
               <div class="nx-team">${esc(teamFullName || myTeam)}</div>
               <div class="nx-coach">Head Coach <b>${esc(coachName)}</b></div>
               <div class="nx-actions">
+                <button type="button" class="nx-btn nx-ml-add" hidden><span><span class="nx-star">★</span><span class="t"></span></span></button>
                 ${rosterLink ? `<a class="nx-btn gold" href="${esc(rosterLink.href)}" target="_blank"><span>Roster Stats</span></a>` : ''}
                 ${standingsLink ? `<a class="nx-btn" href="${esc(standingsLink.href)}"><span>Standings</span></a>` : ''}
                 <a class="nx-btn" href="/html/matchup.php"><span>Head to Head</span></a>
-                <button type="button" class="nx-btn nx-ml-add" hidden><span></span></button>
               </div>
             </div>
             ${rank ? `<div class="nx-hero-rank"><div class="big">${ordinal(rank.pos).toUpperCase()}</div><div class="lab">${esc(standings.division)} · ${esc(rank.pts)} pts</div></div>` : ''}
@@ -1237,19 +1476,19 @@
     // ============================================================
     // 4. Behavior
     // ============================================================
-    // "+ Add to My Leagues": saves this coach page to the user's league list.
+    // "★ Add to My Leagues": saves this coach page to the user's league list.
     const addBtn = $('.nx-ml-add', app);
     const thisLeague = parseCoachUrl(HREF);
     if (thisLeague) {
       const rec = { ...thisLeague, team: myTeam, coach: coachName, league: (leagueOpts.find((o) => o.sel) || {}).t || '', label: '', addedAt: Date.now() };
       const paintAdd = () => {
         const on = myLeagues.has(rec.id);
-        addBtn.firstElementChild.textContent = on ? '✓ In My Leagues' : '+ Add to My Leagues';
+        $('.t', addBtn).textContent = on ? 'In My Leagues' : 'Add to My Leagues';
         addBtn.setAttribute('aria-pressed', String(on));
         addBtn.title = on ? 'This team is in your My Leagues list. Click to remove it.' : 'Save this team to My Leagues (top bar) for one-click access';
       };
       addBtn.hidden = false;
-      addBtn.addEventListener('click', () => { myLeagues.toggle(rec); });
+      addBtn.addEventListener('click', () => { const was = myLeagues.has(rec.id); myLeagues.toggle(rec); if (!was) mlShoot(app, addBtn, 'SCORES!'); });
       document.addEventListener('nx:myleagues', paintAdd);
       paintAdd();
     }
