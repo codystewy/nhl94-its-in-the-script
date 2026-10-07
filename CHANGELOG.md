@@ -3,6 +3,12 @@
 Every release of **NHL94 – It's In The Script**, newest first, in plain English.
 Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.PATCH**. MAJOR goes up for big shake-ups, MINOR for new stuff, PATCH for fixes and polish.
 
+## [2.2.0] – 2026-10-07
+
+### ✨ New
+- **League Discord, one click away.** A **+ League Discord** button now sits next to the League and Level pickers. Paste your league's server invite or channel link once, the button turns blue, and from then on it's a quick pass straight to the league chat. Every league and level keeps its own link.
+- **Manage them in ⚙ Settings.** Change or remove any league's link, or clear them all.
+
 ## [2.1.0] – 2026-10-05
 
 ### ✨ New
@@ -74,6 +80,7 @@ Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.
 - **The coach page, redesigned.** Coach names next to every team, the schedule grouped by opponent, filters that remember you, and a checkpoint countdown.
 - A **Classic / V1** switch so the original site is always one click away.
 
+[2.2.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v1.4.1...v2.0.0

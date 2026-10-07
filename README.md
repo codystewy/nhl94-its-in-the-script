@@ -30,11 +30,9 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 ## What's new
 
-**v2.1.0:** the "whole arena" update.
-- 🏒 **Standings, rosters, stat leaders, records and box scores** all get the new look, in Day and Night.
-- 🏆 **Standings with logos and coaches**, plus a ★ My Team box showing where you sit.
-- 🎨 **Roster pages wear the team's colours**, with a stat strip and a DM button for the coach.
-- 📺 **Broadcast-style box scores**: big logos, a pixel scoreboard and team-coloured stat bars.
+**v2.2.0:** the "where's the league chat again?" update.
+- 💬 **League Discord button** next to the League and Level pickers. Link it once, then one click takes you to your league's Discord.
+- 🏒 Each league and level remembers its own link, and you can manage them all in ⚙ Settings.
 
 See the full [changelog](CHANGELOG.md) for everything else.
 
