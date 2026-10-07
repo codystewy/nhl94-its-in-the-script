@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Fun)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      2.1.0.49
+// @version      2.2.0.50
 // @description  Redesigns nhl94online.com (home, coach, standings, stats, records and box score pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '2.1.0.49';
+  const SCRIPT_VERSION = '2.2.0.50';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'fun';
   const FUN = CHANNEL === 'fun';
