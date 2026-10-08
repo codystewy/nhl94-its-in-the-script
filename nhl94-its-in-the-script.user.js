@@ -2774,7 +2774,7 @@
     const teamRow = (s, k) => {
       const t = k === 'a' ? s.A : s.H, w = k === 'a' ? s.wa : s.wh;
       const cls = (s.winner ? (s.winner === k ? ' win' : ' out') : '') + (isMine(t) ? ' me' : '');
-      return `<div class="nx-po-tm${cls}">
+      return `<div class="nx-po-tm${cls}" data-tm="${esc(t.team)}">
         ${t.logo ? `<img class="nx-logo" src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : logoImg(t.team)}
         <span class="sd" title="Seed ${esc(t.seed)}">${esc(t.seed)}</span>
         <span class="who">${t.href ? `<a class="n" href="${esc(t.href)}" title="${esc(t.team)}">${esc(t.team)}</a>` : `<span class="n" title="${esc(t.team)}">${esc(t.team)}</span>`}
@@ -2793,7 +2793,7 @@
     const seriesCard = (s) => {
       const state = s.winner ? 'done' : s.wa + s.wh ? 'live' : 'new';
       const mineS = isMine(s.A) || isMine(s.H);
-      return `<article class="nx-po-s ${state}${mineS ? ' me' : ''}">
+      return `<article class="nx-po-s ${state}${mineS ? ' me' : ''}" data-win="${esc(s.winner ? (s.winner === 'a' ? s.A : s.H).team : '')}">
         <div class="nx-po-h"><span>${esc(s.best)}</span><b>${esc(s.status)}</b></div>
         ${teamRow(s, 'a')}${teamRow(s, 'h')}
         <div class="nx-po-gs">${s.games.map(gameChip).join('')}</div>
@@ -2842,8 +2842,12 @@
     .nx-po-col { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
     .nx-po-conf { font: 500 11px var(--nx-cond); letter-spacing: 1.4px; text-transform: uppercase; color: var(--nx-mute); margin-bottom: -4px; }
     .nx-po-s { position: relative; background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: 8px; box-shadow: var(--nx-shadow); }
-    .nx-po-r:not(.last) .nx-po-s::after { content: ""; position: absolute; left: 100%; top: 50%; width: 10px; border-top: 2px solid var(--nx-line2); }
-    .nx-po-r + .nx-po-r .nx-po-s::before { content: ""; position: absolute; right: 100%; top: 50%; width: 10px; border-top: 2px solid var(--nx-line2); }
+    .nx-po { position: relative; }
+    .nx-po-r { position: relative; z-index: 1; }
+    svg.nx-po-lines { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+    svg.nx-po-lines path { fill: none; stroke: color-mix(in srgb, var(--nx-mute) 55%, transparent); stroke-width: 2; }
+    svg.nx-po-lines path.champ { stroke: var(--nx-acc); stroke-width: 2.5; }
+    svg.nx-po-lines path.me { stroke: var(--nx-gold); stroke-width: 2.5; }
     .nx-po-s.me { border-color: var(--nx-gold); box-shadow: 0 0 0 1px var(--nx-gold), var(--nx-shadow); }
     .nx-po-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 10px; font: 500 11px var(--nx-cond);
       letter-spacing: 1.2px; text-transform: uppercase; color: var(--nx-mute); background: var(--nx-thead); border-radius: 8px 8px 0 0; border-bottom: 1px solid var(--nx-line); }
@@ -2882,18 +2886,45 @@
       .nx-po { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
       .nx-po-r { order: calc(-1 * var(--n)); }
       .nx-po-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-      .nx-po-s::before, .nx-po-s::after { display: none; }
+      svg.nx-po-lines { display: none; }
       .nx-po-conf { grid-column: 1 / -1; margin: 0; }
     }
     `);
     const tabsB = P.tabs.length > 1 ? { label: 'Level', links: Object.assign(P.tabs, { key: 'playslg' }) } : null;
-    return statMount(`
+    const app = statMount(`
       ${statHeroHtml({ eyebrow: ['Playoffs', leagueName, P.curTab].filter(Boolean).join(' · '), title: `${P.curTab ? P.curTab + ' ' : ''}Playoffs`,
         sub: P.desc ? esc(P.desc) : '', side, bar }).replace('nx-s-hero', 'nx-s-hero nx-po-hero')}
       ${tabsB ? `<div class="nx-s-bar">${tabsHtml(tabsB)}</div>` : ''}
       ${P.rounds.length ? `<div class="nx-po">${P.rounds.map(roundCol).join('')}</div>`
         : '<div class="nx-card nx-s-card" style="margin-top:18px"><div class="nx-empty">No playoff series for this level yet.</div></div>'}
     `, P.champ && TEAM_COLORS[P.champ.team] ? teamPalette(P.champ.team) : HOME_PALETTE);
+    const po = $('.nx-po', app);
+    if (po && window.ResizeObserver) new ResizeObserver(() => drawPlayoffLines(po, P.champ && P.champ.team)).observe(po);
+    return app;
+  }
+
+  // Bracket lines: from a series winner's row to that team's row in the next round (elbow in the gap).
+  // The champion's run is traced in the accent colour, my team's in gold. Stacked (phone) layout has no lines.
+  function drawPlayoffLines(po, champ) {
+    let svg = $('svg.nx-po-lines', po);
+    if (!svg) { svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'nx-po-lines'); svg.setAttribute('aria-hidden', 'true'); po.prepend(svg); }
+    const cols = $$('.nx-po-r', po), base = po.getBoundingClientRect();
+    if (!base.width || getComputedStyle(svg).display === 'none') return;
+    const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left - base.left + po.scrollLeft, r: r.right - base.left + po.scrollLeft, y: r.top - base.top + r.height / 2 }; };
+    const plain = [], hi = []; // highlighted runs go last so they sit on top
+    for (let i = 1; i < cols.length; i++) {
+      $$('.nx-po-tm', cols[i]).forEach((to) => {
+        const team = to.dataset.tm;
+        const from = $$('.nx-po-s', cols[i - 1]).find((s) => s.dataset.win === team);
+        const fromRow = from && $$('.nx-po-tm', from).find((r) => r.dataset.tm === team);
+        if (!fromRow) return;
+        const a = box(fromRow), b = box(to), ar = box(from).r, mx = (ar + b.l) / 2;
+        const cls = team === champ ? 'champ' : to.classList.contains('me') ? 'me' : '';
+        (cls ? hi : plain).push(`<path${cls ? ` class="${cls}"` : ''} d="M${ar} ${a.y}H${mx}V${b.y}H${b.l}"/>`);
+      });
+    }
+    svg.setAttribute('width', po.scrollWidth); svg.setAttribute('height', po.scrollHeight);
+    svg.innerHTML = plain.join('') + hi.join('');
   }
 
   // ============================================================
