@@ -76,7 +76,7 @@ See the full [changelog](CHANGELOG.md) for everything else.
 
 The version at the top right of **⚙ Settings** shows which channel you're on. To switch, see [Switching channels](INSTALL.md#switching-channels).
 
-**Redesigned pages so far:** Home, Coach, Standings, Team Rosters, Player Stat Leaders, League Records, All-Time User Standings, Site Records and Box Scores. Pages that haven't been redesigned yet look exactly like the original site.
+**Redesigned pages so far:** Home, Coach, Standings, Team Rosters, Player Stat Leaders, League Records, All-Time User Standings, Site Records, Playoffs and Box Scores (playoff games too). Pages that haven't been redesigned yet look exactly like the original site.
 
 Updates install automatically. Tampermonkey checks this repo about once a day: Stable updates when a new version is released, and Latest and Fun update with every change.
 
