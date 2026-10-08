@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Render a real nhl94online.com coach page with the userscript injected, using headless Chrome.
-# Usage: dev/preview.sh [team_ID|home|standings|roster|records|players|allstats|siterecords|box] [view] [width] [height]
-#   stats pages use LG/SUBLG; QS='a=1&b=2' replaces the query string, TID=<team_ID> picks a roster, GAMEID=<id> a box score
+# Usage: dev/preview.sh [team_ID|home|standings|roster|records|players|allstats|siterecords|box|playoffs|plbox] [view] [width] [height]
+#   stats pages use LG/SUBLG; QS='a=1&b=2' replaces the query string, TID=<team_ID> picks a roster, GAMEID=<id> a box score, PLAYSLG=<level> a playoff level
 #   team_ID  a coach page team_ID (default 6714 = Calgary, SNES-CD, Classic '94-2026 Fall), or "home"
 #            for the home page (set SUBLG=SNES-CD etc. to pick the scores level)
 #   view     classic | v1 | ...  (defaults to newest)
@@ -36,6 +36,8 @@ case "$TEAM" in
   allstats) stat allstats "sys=GENS" ;;
   siterecords) stat site_records "sys=GENS" ;;
   box) stat box_score "gameid=${GAMEID:-129808}" ;;
+  playoffs) stat playoffs "lg=$LG${PLAYSLG:+&playslg=$PLAYSLG}" ;;
+  plbox) stat pl_box_score "gameid=${GAMEID:-29406}" ;;
   *) URL="https://nhl94online.com/html/coachpage.php?lg=$LG&sublg=$SUBLG&team_ID=$TEAM"; TPATH="/html/coachpage.php" ;;
 esac
 curl -sL "$URL" -o "$OUT/page.html"
