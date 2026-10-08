@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NHL94 – It's In The Script (Latest)
 // @namespace    https://github.com/codystewy/nhl94-its-in-the-script
-// @version      2.2.0.50
+// @version      2.2.0.56
 // @description  Redesigns nhl94online.com (home, coach, standings, stats, records and box score pages): coach names on the schedule, grouped by opponent, saved filters, and a switchable NHL 26 x 16-bit look.
 // @author       codystewy
 // @homepageURL  https://github.com/codystewy/nhl94-its-in-the-script
@@ -24,7 +24,7 @@
   if (document.querySelector('.nx-root, .nx-switch')) return;
 
   // Keep in sync with @version above (GM_info would report the dev loader's version).
-  const SCRIPT_VERSION = '2.2.0.50';
+  const SCRIPT_VERSION = '2.2.0.56';
   // Release channel: 'stable' here; dev/build-channel.sh stamps 'latest' or 'fun'.
   const CHANNEL = 'latest';
   const FUN = CHANNEL === 'fun';
@@ -54,7 +54,8 @@
   const PATH = window.__nxTestPath || location.pathname; // __nxTestPath / __nxTestHref: set by dev/preview.sh only
   const HREF = window.__nxTestHref || location.href;
   const STAT_PAGES = { standings: 'standings', roster_stats: 'roster', records: 'records', player_stats: 'players',
-    allstats: 'allstats', site_records: 'siterecords', box_score: 'boxscore' };
+    allstats: 'allstats', site_records: 'siterecords', box_score: 'boxscore',
+    pl_box_score: 'boxscore', playoffs: 'playoffs' };
   const statPage = (/^\/html\/([a-z_]+)\.php$/i.exec(PATH) || [])[1];
   const PAGE = /\/html\/coachpage\.php$/i.test(PATH) ? 'coach'
     : /^\/(index\.php)?$/i.test(PATH) ? 'home'
@@ -2409,7 +2410,7 @@
     wireCtls(app);
     // The page's own level tabs replace the league bar's level picker (one way to switch, not two).
     // A box score's sidebar shows a default level, not the game's, so it gets no level picker either.
-    if ($('.nx-s-tabs[data-key="sublg"]', app) || PAGE === 'boxscore') { const lv = $('.nx-lgbar-f.lv', app); if (lv) lv.remove(); }
+    if ($('.nx-s-tabs[data-key="sublg"]', app) || PAGE === 'boxscore' || PAGE === 'playoffs') { const lv = $('.nx-lgbar-f.lv', app); if (lv) lv.remove(); }
     return app;
   }
   const levelTitle = (lv) => lv || 'All Levels';
@@ -2690,6 +2691,240 @@
     const h = B.find((b) => b.type === 'h');
     return statMount(`${statHeroHtml({ eyebrow: leagueName, title: h ? h.text : document.title })}${ctlBarHtml(B.filter((b) => /^(tabs|select|value)$/.test(b.type)))}
       ${blocksHtml(B.filter((b) => b !== h && !/^(tabs|select|value)$/.test(b.type)))}`);
+  }
+
+  // ---------- V1 · Playoffs ----------
+  // The original lists rounds newest first, each series as a matchup table + a game table.
+  // We rebuild it as a bracket: Round 1 on the left, the final on the right.
+  function scrapePlayoffs() {
+    const tabs = $$('a[href*="playoffs.php"]').filter((a) => /playslg=/.test(a.getAttribute('href') || '') && /link4/.test(a.className))
+      .map((a) => ({ text: norm(a.textContent), href: a.href, v: new URL(a.href, location.href).searchParams.get('playslg') }));
+    const curTab = qp('playslg') || (tabs[0] || {}).v || '';
+    tabs.forEach((t) => { t.on = t.v === curTab; });
+    const descL = $$('span.text_black_it').find((s) => /^Playoff Description:?$/.test(norm(s.textContent)));
+    const desc = descL ? norm((($$('span.text_black_it').filter((s) => s !== descL && descL.compareDocumentPosition(s) & 4))[0] || {}).textContent || '') : '';
+    const rounds = [];
+    let round = null, conf = '';
+    $$('span.heading_black, table.small_black').forEach((el) => {
+      if (el.tagName === 'SPAN') {
+        const t = norm(el.textContent), m = /^ROUND\s+(\d+)\s*(.*?)\s*\|\s*(.*)$/i.exec(t);
+        if (m) { round = { n: +m[1], level: m[2], name: m[3] || 'Round ' + m[1], series: [] }; rounds.push(round); conf = ''; }
+        else if (round && t) conf = t;
+        return;
+      }
+      const hd = el.rows[0] && [...el.rows[0].cells].map((c) => norm(c.textContent));
+      if (!round || !hd || !/^Best of \d+/i.test(hd[0] || '')) return;
+      const mt = el.previousElementSibling;
+      if (!mt || mt.tagName !== 'TABLE' || mt.rows.length < 2) return;
+      const side = (i) => {
+        const img = mt.rows[0].cells[i] && mt.rows[0].cells[i].querySelector('img'), c = mt.rows[1].cells[i];
+        if (!c) return null;
+        const a = c.querySelector('a'), name = norm(a ? a.textContent : (c.firstChild || {}).textContent || '');
+        const texts = [...c.childNodes].filter((n) => n.nodeType === 3).map((n) => norm(n.textContent)).filter(Boolean);
+        return { team: name, href: a ? a.href : '', id: teamIdOf(a && a.href), seed: ((/\((\d+)\)/.exec(c.textContent)) || [])[1] || '',
+          coach: texts.filter((x) => !/^\(\d+\)$/.test(x)).pop() || '', logo: img ? img.getAttribute('src') : '' };
+      };
+      const A = side(0), H = side(2);
+      if (!A || !H) return;
+      const games = [...el.rows].slice(1).filter((r) => r.cells.length >= 3).map((r) => {
+        const v = [...r.cells].map((c) => norm(c.textContent));
+        const box = r.cells[0].querySelector('a'), log = r.cells[2].querySelector('a');
+        const m = /^(\d+)-(\d+)\s*([A-Za-z.]+)?\s*(OT)?/i.exec(v[2]);
+        return { n: v[0].replace(/^Game\s*/i, ''), at: v[1].replace(/^@\s*/, ''), when: v[3] && v[3] !== '-' ? v[3] : '',
+          box: box ? box.href : '', log: log ? log.href : '', played: !!m, hi: m ? +m[1] : 0, lo: m ? +m[2] : 0,
+          win: m ? (m[3] || '') : '', ot: !!(m && m[4]), ifNec: /if nec/i.test(v[2]) };
+      });
+      // Abbreviations ("EDM", "ASE") -> which side. Game 1 is at the higher seed's (left team's) rink.
+      const sideOf = (ab) => {
+        const a = abbrScore(ab, A.team), h = abbrScore(ab, H.team);
+        if (a !== h) return a > h ? 'a' : 'h';
+        return games[0] && games[0].at === ab ? 'a' : 'h';
+      };
+      games.forEach((g) => { if (g.played && g.win) g.side = sideOf(g.win); });
+      const status = hd[1] || '', sm = /^(\S+)\s+wins\b/i.exec(status);
+      const wa = games.filter((g) => g.side === 'a').length, wh = games.filter((g) => g.side === 'h').length;
+      const winner = sm ? sideOf(sm[1]) : '';
+      round.series.push({ A, H, games, wa, wh, best: hd[0], status, winner, conf });
+    });
+    rounds.sort((a, b) => a.n - b.n);
+    // Bracket order: walk back from the latest round so each series sits next to where its teams came from.
+    for (let i = rounds.length - 2; i >= 0; i--) {
+      const left = [...rounds[i].series], out = [];
+      rounds[i + 1].series.forEach((s) => [s.A, s.H].forEach((t) => {
+        const k = left.findIndex((x) => x.A.team === t.team || x.H.team === t.team);
+        if (k >= 0) out.push(left.splice(k, 1)[0]);
+      }));
+      rounds[i].series = out.concat(left);
+    }
+    // A finished one-series round after a two-series round is the final.
+    const last = rounds[rounds.length - 1], prev = rounds[rounds.length - 2];
+    const fin = last && last.series.length === 1 && (!prev || prev.series.length === 2) && rounds.length > 1 ? last.series[0] : null;
+    const champ = fin && fin.winner ? (fin.winner === 'a' ? fin.A : fin.H) : null;
+    return { tabs, curTab, desc, rounds, champ };
+  }
+
+  function renderPlayoffsV1() {
+    statSetup();
+    const P = scrapePlayoffs();
+    const me = mine();
+    const isMine = (t) => me.ids.has(String(t.id)) || me.coaches.has((t.coach || '').toLowerCase());
+    const all = P.rounds.flatMap((r) => r.series.map((s) => ({ ...s, r })));
+    const played = all.flatMap((s) => s.games.filter((g) => g.played));
+    const confsIn = (r) => new Set(r.series.map((s) => s.conf).filter(Boolean)).size > 1;
+    const teamRow = (s, k) => {
+      const t = k === 'a' ? s.A : s.H, w = k === 'a' ? s.wa : s.wh;
+      const cls = (s.winner ? (s.winner === k ? ' win' : ' out') : '') + (isMine(t) ? ' me' : '');
+      return `<div class="nx-po-tm${cls}" data-tm="${esc(t.team)}">
+        ${t.logo ? `<img class="nx-logo" src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : logoImg(t.team)}
+        <span class="sd" title="Seed ${esc(t.seed)}">${esc(t.seed)}</span>
+        <span class="who">${t.href ? `<a class="n" href="${esc(t.href)}" title="${esc(t.team)}">${esc(t.team)}</a>` : `<span class="n" title="${esc(t.team)}">${esc(t.team)}</span>`}
+          <span class="c"><span title="${esc(t.coach)}">${esc(t.coach)}</span>${dcSlot(t.coach)}</span></span>
+        <span class="w" aria-label="${w} ${w === 1 ? 'win' : 'wins'}">${w}</span></div>`;
+    };
+    const gameChip = (g) => {
+      const tip = `Game ${g.n} @ ${g.at}${g.when ? ' · ' + g.when : ''}`;
+      if (g.played) {
+        const inner = `<span class="g">G${esc(g.n)}</span><span class="r"><b>${esc(g.win)}</b> ${g.hi}-${g.lo}${g.ot ? ' <em>OT</em>' : ''}</span>`;
+        return g.box ? `<a class="nx-po-g" href="${esc(g.box)}" title="${esc(tip)} · Box score">${inner}</a>` : `<span class="nx-po-g" title="${esc(tip)}">${inner}</span>`;
+      }
+      if (g.log) return `<a class="nx-po-g log" href="${esc(g.log)}" title="${esc(tip)} · Log this game"><span class="g">G${esc(g.n)}</span><span class="r">Log</span></a>`;
+      return `<span class="nx-po-g nec" title="${esc(tip)}${g.ifNec ? ' · if necessary' : ''}"><span class="g">G${esc(g.n)}</span><span class="r">${g.ifNec ? 'If nec.' : '–'}</span></span>`;
+    };
+    const seriesCard = (s) => {
+      const state = s.winner ? 'done' : s.wa + s.wh ? 'live' : 'new';
+      const mineS = isMine(s.A) || isMine(s.H);
+      return `<article class="nx-po-s ${state}${mineS ? ' me' : ''}" data-win="${esc(s.winner ? (s.winner === 'a' ? s.A : s.H).team : '')}">
+        <div class="nx-po-h"><span>${esc(s.best)}</span><b>${esc(s.status)}</b></div>
+        ${teamRow(s, 'a')}${teamRow(s, 'h')}
+        <div class="nx-po-gs">${s.games.map(gameChip).join('')}</div>
+      </article>`;
+    };
+    const roundCol = (r) => {
+      let lastConf = null;
+      const body = r.series.map((s) => {
+        const h = confsIn(r) && s.conf !== lastConf ? `<div class="nx-po-conf">${esc(s.conf)}</div>` : '';
+        lastConf = s.conf;
+        return h + seriesCard(s);
+      }).join('');
+      return `<section class="nx-po-r${r === P.rounds[P.rounds.length - 1] ? ' last' : ''}" style="--n:${r.n}">
+        <header><span class="k">Round ${r.n}</span><h2>${esc(r.name)}</h2></header>
+        <div class="nx-po-col">${body}</div></section>`;
+    };
+    // Hero side: the champion, else where my team stands.
+    const myS = [...all].reverse().find((s) => isMine(s.A) || isMine(s.H));
+    let side = '';
+    if (P.champ) {
+      side = `<div class="nx-hero-rank nx-po-champ"><div class="lab">🏆 Champion</div>
+        ${P.champ.logo ? `<img src="${esc(P.champ.logo.replace(/logos\d+\//, 'logos100/'))}" alt="" onerror="this.src='${esc(P.champ.logo)}'">` : ''}
+        <div class="who">${esc(P.champ.team)}</div><div class="lab">${esc(P.champ.coach)}</div></div>`;
+    } else if (myS) {
+      const t = isMine(myS.A) ? myS.A : myS.H, k = t === myS.A ? 'a' : 'h';
+      const w = k === 'a' ? myS.wa : myS.wh, l = k === 'a' ? myS.wh : myS.wa;
+      const st = myS.winner ? (myS.winner === k ? `Won ${myS.r.name}` : `Out in ${myS.r.name}`) : `${myS.r.name} · ${w > l ? 'leads' : w < l ? 'trails' : 'tied'} ${w}-${l}`;
+      side = heroSideMine(t.team, st);
+    }
+    const cur = P.rounds[P.rounds.length - 1];
+    const stat = (k, v) => `<div class="nx-stat"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+    const bar = P.rounds.length ? `<div class="nx-statbar">${stat('Round', `${cur.n}<small> / ${esc(cur.name)}</small>`)}
+      ${stat('Series Left', all.filter((s) => !s.winner).length)}${stat('Games Played', played.length)}
+      ${stat('OT Games', played.filter((g) => g.ot).length)}${stat('Sweeps', all.filter((s) => s.winner && !Math.min(s.wa, s.wh)).length)}</div>` : '';
+    addCss(`
+    .nx-po-hero .nx-stat .v small { font-size: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.7); }
+    .nx-po-champ img { display: block; width: 72px; height: 72px; margin: 8px auto 2px; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,.5)); }
+    .nx-po-champ .lab:last-child { margin-top: 2px; }
+    .nx-po { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 20px; margin-top: 18px; padding-bottom: 6px; overflow-x: auto; }
+    .nx-po-r { display: flex; flex-direction: column; min-width: 0; }
+    .nx-po-r header { padding: 0 2px 8px; margin-bottom: 10px; border-bottom: 2px solid var(--nx-red); }
+    .nx-po-r header .k { font-family: var(--nx-px); font-size: 8px; color: var(--nx-acc); }
+    .nx-po-r header h2 { margin: 5px 0 0; font: 600 17px var(--nx-cond); text-transform: uppercase; letter-spacing: 1.3px; color: var(--nx-strong); }
+    .nx-v1[data-nx-theme="day"] .nx-po-r header h2 { color: #10264d; }
+    .nx-po-r.last header { border-bottom-color: var(--nx-gold); }
+    .nx-po-col { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 10px; }
+    .nx-po-conf { font: 500 11px var(--nx-cond); letter-spacing: 1.4px; text-transform: uppercase; color: var(--nx-mute); margin-bottom: -4px; }
+    .nx-po-s { position: relative; background: var(--nx-card); border: 1px solid var(--nx-line); border-radius: 8px; box-shadow: var(--nx-shadow); }
+    .nx-po { position: relative; }
+    .nx-po-r { position: relative; z-index: 1; }
+    svg.nx-po-lines { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+    svg.nx-po-lines path { fill: none; stroke: color-mix(in srgb, var(--nx-mute) 55%, transparent); stroke-width: 2; }
+    svg.nx-po-lines path.champ { stroke: var(--nx-acc); stroke-width: 2.5; }
+    svg.nx-po-lines path.me { stroke: var(--nx-gold); stroke-width: 2.5; }
+    .nx-po-s.me { border-color: var(--nx-gold); box-shadow: 0 0 0 1px var(--nx-gold), var(--nx-shadow); }
+    .nx-po-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 10px; font: 500 11px var(--nx-cond);
+      letter-spacing: 1.2px; text-transform: uppercase; color: var(--nx-mute); background: var(--nx-thead); border-radius: 8px 8px 0 0; border-bottom: 1px solid var(--nx-line); }
+    .nx-po-h b { font-weight: 600; color: var(--nx-strong); }
+    .nx-po-s.done .nx-po-h b { color: var(--nx-acc); }
+    .nx-po-s.new .nx-po-h b { color: var(--nx-mute); }
+    .nx-po-tm { display: grid; grid-template-columns: 20px 14px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 4px 10px; min-height: 30px; border-bottom: 1px solid var(--nx-line); }
+    .nx-po-tm .nx-logo { width: 20px; height: 20px; image-rendering: pixelated; }
+    .nx-po-tm .sd { font-family: var(--nx-px); font-size: 8px; color: var(--nx-dim); text-align: center; }
+    .nx-po-tm .who { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+    .nx-po-tm .n { font: 600 14px/1.2 var(--nx-cond); text-transform: uppercase; letter-spacing: .5px; color: var(--nx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
+    .nx-po-tm a.n:hover { color: var(--nx-acc); }
+    .nx-po-tm .c { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; font-size: 12px; font-weight: 600; color: var(--nx-acc); }
+    .nx-po-tm .w { font-family: var(--nx-px); font-size: 12px; color: var(--nx-mute); min-width: 18px; text-align: right; }
+    .nx-po-tm.win { background: color-mix(in srgb, var(--nx-gold) 10%, transparent); }
+    .nx-po-tm.win .n { color: var(--nx-strong); } .nx-po-tm.win .w { color: var(--nx-acc); }
+    .nx-po-tm.out .n, .nx-po-tm.out .w { color: var(--nx-dim); }
+    .nx-po-tm.out .nx-logo { filter: grayscale(.7); opacity: .7; }
+    .nx-po-tm.me { box-shadow: inset 4px 0 0 var(--nx-gold); }
+    .nx-po-tm .c > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+    .nx-po-tm .nx-dc-slot { margin-left: 5px; flex: none; } .nx-po-tm .nx-dc { height: 20px; width: 24px; padding: 0; justify-content: center; } .nx-po-tm .nx-dc span { display: none; } .nx-po-tm .nx-dc svg { width: 12px; height: 12px; }
+    .nx-po-tm .nx-dc-edit { width: 20px; height: 20px; }
+    .nx-po-gs { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px 7px; }
+    .nx-po-g { display: flex; align-items: baseline; gap: 5px; padding: 3px 6px; border: 1px solid var(--nx-line2); border-radius: 4px; background: var(--nx-bg2);
+      font-variant-numeric: tabular-nums; color: var(--nx-text); white-space: nowrap; }
+    .nx-po-g .g { font-size: 10px; color: var(--nx-dim); }
+    .nx-po-g .r { font: 500 13px var(--nx-cond); white-space: nowrap; } .nx-po-g .r b { font-weight: 700; color: var(--nx-strong); }
+    .nx-po-g .r em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--nx-tie); }
+    .nx-v1[data-nx-theme="day"] .nx-po-g .r em { color: #8a6100; }
+    a.nx-po-g:hover { border-color: var(--nx-acc); }
+    .nx-po-g.log { background: var(--nx-red); border-color: var(--nx-red); }
+    .nx-po-g.log .g, .nx-po-g.log .r { color: var(--nx-on-red); } .nx-po-g.log .r { font-weight: 600; text-transform: uppercase; letter-spacing: .6px; font-size: 12px; }
+    .nx-po-g.log:hover { filter: brightness(1.12); }
+    .nx-po-g.nec { border-style: dashed; background: none; } .nx-po-g.nec .r { color: var(--nx-dim); }
+    @media (max-width: 1000px) {
+      .nx-po { grid-auto-flow: row; grid-auto-columns: auto; overflow: visible; }
+      .nx-po-r { order: calc(-1 * var(--n)); }
+      .nx-po-col { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      svg.nx-po-lines { display: none; }
+      .nx-po-conf { grid-column: 1 / -1; margin: 0; }
+    }
+    `);
+    const tabsB = P.tabs.length > 1 ? { label: 'Level', links: Object.assign(P.tabs, { key: 'playslg' }) } : null;
+    const app = statMount(`
+      ${statHeroHtml({ eyebrow: ['Playoffs', leagueName, P.curTab].filter(Boolean).join(' · '), title: `${P.curTab ? P.curTab + ' ' : ''}Playoffs`,
+        sub: P.desc ? esc(P.desc) : '', side, bar }).replace('nx-s-hero', 'nx-s-hero nx-po-hero')}
+      ${tabsB ? `<div class="nx-s-bar">${tabsHtml(tabsB)}</div>` : ''}
+      ${P.rounds.length ? `<div class="nx-po">${P.rounds.map(roundCol).join('')}</div>`
+        : '<div class="nx-card nx-s-card" style="margin-top:18px"><div class="nx-empty">No playoff series for this level yet.</div></div>'}
+    `, P.champ && TEAM_COLORS[P.champ.team] ? teamPalette(P.champ.team) : HOME_PALETTE);
+    const po = $('.nx-po', app);
+    if (po && window.ResizeObserver) new ResizeObserver(() => drawPlayoffLines(po, P.champ && P.champ.team)).observe(po);
+    return app;
+  }
+
+  // Bracket lines: from a series winner's row to that team's row in the next round (elbow in the gap).
+  // The champion's run is traced in the accent colour, my team's in gold. Stacked (phone) layout has no lines.
+  function drawPlayoffLines(po, champ) {
+    let svg = $('svg.nx-po-lines', po);
+    if (!svg) { svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'nx-po-lines'); svg.setAttribute('aria-hidden', 'true'); po.prepend(svg); }
+    const cols = $$('.nx-po-r', po), base = po.getBoundingClientRect();
+    if (!base.width || getComputedStyle(svg).display === 'none') return;
+    const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left - base.left + po.scrollLeft, r: r.right - base.left + po.scrollLeft, y: r.top - base.top + r.height / 2 }; };
+    const plain = [], hi = []; // highlighted runs go last so they sit on top
+    for (let i = 1; i < cols.length; i++) {
+      $$('.nx-po-tm', cols[i]).forEach((to) => {
+        const team = to.dataset.tm;
+        const from = $$('.nx-po-s', cols[i - 1]).find((s) => s.dataset.win === team);
+        const fromRow = from && $$('.nx-po-tm', from).find((r) => r.dataset.tm === team);
+        if (!fromRow) return;
+        const a = box(fromRow), b = box(to), ar = box(from).r, mx = (ar + b.l) / 2;
+        const cls = team === champ ? 'champ' : to.classList.contains('me') ? 'me' : '';
+        (cls ? hi : plain).push(`<path${cls ? ` class="${cls}"` : ''} d="M${ar} ${a.y}H${mx}V${b.y}H${b.l}"/>`);
+      });
+    }
+    svg.setAttribute('width', po.scrollWidth); svg.setAttribute('height', po.scrollHeight);
+    svg.innerHTML = plain.join('') + hi.join('');
   }
 
   // ============================================================
@@ -3280,7 +3515,7 @@
   const ALL_VERSIONS = [
     { id: 'classic', label: 'Classic', title: 'Original nhl94online.com page' },
     { id: 'v1', label: 'V1', title: 'V1 · Rink Night', pages: {
-      coach: renderCoachV1, home: renderHomeV1, standings: renderStandingsV1, roster: renderRosterV1, boxscore: renderBoxScoreV1,
+      coach: renderCoachV1, home: renderHomeV1, standings: renderStandingsV1, roster: renderRosterV1, boxscore: renderBoxScoreV1, playoffs: renderPlayoffsV1,
       records: () => renderListV1('records'), players: () => renderListV1('players'), allstats: () => renderListV1('allstats'), siterecords: () => renderListV1('siterecords'),
     } },
   ];
