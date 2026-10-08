@@ -30,9 +30,10 @@ A Tampermonkey userscript that redesigns [nhl94online.com](https://nhl94online.c
 
 ## What's new
 
-**v2.2.0:** the "where's the league chat again?" update.
-- 💬 **League Discord button** next to the League and Level pickers. Link it once, then one click takes you to your league's Discord.
-- 🏒 Each league and level remembers its own link, and you can manage them all in ⚙ Settings.
+**v2.3.0:** the "who's still alive?" update.
+- 🏆 **Playoffs become a real bracket** with a card for every series, coaches and series scores.
+- 📈 Lines follow each winner into the next round, and the champion's run is traced in colour.
+- 🥅 One-click **Log** buttons for unplayed games, and playoff box scores get the new look.
 
 See the full [changelog](CHANGELOG.md) for everything else.
 

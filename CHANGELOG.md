@@ -3,6 +3,15 @@
 Every release of **NHL94 – It's In The Script**, newest first, in plain English.
 Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.PATCH**. MAJOR goes up for big shake-ups, MINOR for new stuff, PATCH for fixes and polish.
 
+## [2.3.0] – 2026-10-07
+
+### ✨ New
+- **Playoffs, bracket style.** The playoff page is now a real bracket: Round 1 on the left, the final on the right, with every series on its own card. You get logos, seeds, coaches, a Discord DM button and the series score in big pixel numbers.
+- **Follow the road to the Cup.** Lines carry each series winner into the next round, and the champion's whole run is traced in colour.
+- **Champion on the podium.** Once the final is done, the champ takes the top of the page and the page wears their colours. Until then your own team shows up there, telling you whether you lead, trail or are already out.
+- **Log Game, right there.** Unplayed games are red **Log** buttons. Played ones show the winner and score, and one click opens the box score. Playoff box scores now get the broadcast look too.
+- **Playoff stats strip.** Current round, series left, games played, OT games and sweeps, for bragging rights.
+
 ## [2.2.0] – 2026-10-07
 
 ### ✨ New
@@ -80,6 +89,7 @@ Version numbers follow [Semantic Versioning](https://semver.org): **MAJOR.MINOR.
 - **The coach page, redesigned.** Coach names next to every team, the schedule grouped by opponent, filters that remember you, and a checkpoint countdown.
 - A **Classic / V1** switch so the original site is always one click away.
 
+[2.3.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/codystewy/nhl94-its-in-the-script/compare/v2.0.0...v2.0.1
