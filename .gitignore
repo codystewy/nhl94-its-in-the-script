@@ -4,3 +4,4 @@ dev/local-loader.user.js
 *.backup.txt
 bakup.js
 /screenshots/
+/docs/troubleshooting/
